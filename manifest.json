@@ -1,0 +1,14 @@
+{
+  "name": "小芒狗记账",
+  "short_name": "小芒狗",
+  "description": "和小芒狗一起好好记账～",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFAF0",
+  "theme_color": "#FFD56B",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
