@@ -2818,13 +2818,25 @@ async function callDeepSeekVision(base64Data, type) {
 
   const catList = type === 'income' ? INC_CAT_LIST : CAT_LIST;
 
-  const textPrompt = `你是记账助手。分析这张图片，把里面显示的消费或收入记录解析成 JSON 数组。
-每条包含：desc（简短描述，10字内）、category（分类）、amount（数字）、date（YYYY-MM-DD 格式）。
-分类只能从这些里选：${catList.join('、')}。
-日期参考：今天=${today}，昨天=${yesterday}，前天=${dayBefore}。
-如果图片中没明确时间，date 用 ${today}。
-如果图片不是账单/支付截图，返回空数组 []。
-只返回 JSON 数组，不要任何其他文字、不要 markdown 代码块。`;
+  const textPrompt = `你是一个专业的记账助手，擅长从支付截图（微信支付、支付宝等）中提取账单信息。
+
+请仔细阅读图片中的每一行文字，把你能找到的每一笔消费/收入都解析出来，返回 JSON 数组。
+每条记录包含：
+- desc: 简短描述（取商户名或商品名，10字以内）
+- category: 从以下分类中选最合适的：${catList.join('、')}
+- amount: 金额数字
+- date: YYYY-MM-DD 格式
+
+重要规则：
+1. 日期参考：今天=${today}，昨天=${yesterday}，前天=${dayBefore}
+2. 如果图片中有明确时间，用那个时间；否则用 ${today}
+3. 微信支付的"收款方"或"商户"就是 desc 来源
+4. 金额单位是"元"，看到"¥"或"￥"后面的数字就是金额
+5. 只要图片中有任何金额信息，就一定要提取出来，不要遗漏
+6. 即使图片模糊或不完整，也尽量提取你能识别到的内容
+
+返回格式示例（只返回 JSON，无 markdown）：
+[{"desc":"麦当劳","category":"餐饮","amount":35.0,"date":"${today}"}]`;
 
   try {
     const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
