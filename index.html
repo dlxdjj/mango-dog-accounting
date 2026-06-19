@@ -8,7 +8,6 @@
 <meta name="apple-mobile-web-app-title" content="小芒狗">
 <meta name="theme-color" content="#FFF8E7">
 <link rel="manifest" href="manifest.json">
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <title>小芒狗记账</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
@@ -436,13 +435,6 @@ html, body {
   filter: none;
   transform: scale(1.08);
 }
-.input-tab.screenshot-tab {
-  background: linear-gradient(135deg, var(--mango-light), var(--mango));
-  color: var(--ink);
-  font-size: 12px;
-}
-.input-tab.screenshot-tab:active { transform: scale(0.95); }
-
 /* 录音按钮区 */
 .input-area-voice {
   display: flex; flex-direction: column; align-items: center;
@@ -1920,12 +1912,7 @@ html, body {
             <img src="" id="tabTextImg" alt="">
             <span>文字</span>
           </div>
-          <div class="input-tab screenshot-tab" data-tab="shot" onclick="openScreenshot()">
-            <span style="font-size:18px">📷</span>
-            <span>截图记账</span>
-          </div>
         </div>
-        <input type="file" id="screenshotInput" style="display:none" accept="image/*" onchange="handleScreenshotFile(this.files[0])">
 
         <div class="input-area-voice" id="tab-voice">
           <div class="record-wrap" id="recordWrap">
@@ -2552,10 +2539,10 @@ function calcStreak() {
 }
 
 // ===== Tab 切换 =====
-document.querySelectorAll('.input-tab:not(.screenshot-tab)').forEach(tab => {
+document.querySelectorAll('.input-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     const t = tab.dataset.tab;
-    document.querySelectorAll('.input-tab:not(.screenshot-tab)').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.input-tab').forEach(x => x.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('tab-voice').style.display = t === 'voice' ? 'flex' : 'none';
     document.getElementById('tab-text').style.display = t === 'text' ? 'block' : 'none';
@@ -2752,90 +2739,6 @@ async function callDeepSeek(text, type) {
     showToast('解析失败：' + err.message);
     return null;
   }
-}
-
-// ===== 截图记账 =====
-function openScreenshot() {
-  document.getElementById('screenshotInput').click();
-}
-
-async function handleScreenshotFile(file) {
-  if (!file) return;
-  haptic('light');
-
-  const reader = new FileReader();
-  reader.onload = async function() {
-    const base64 = reader.result;
-    console.log('[截图记账] 图片大小:', (base64.length / 1024).toFixed(1), 'KB');
-
-    // 第一步：OCR 提取文字
-    const T = window.Tesseract;
-    if (!T) {
-      showToast('OCR 引擎加载中，请稍后再试');
-      haptic('error');
-      return;
-    }
-
-    const loadingImgs = ['paint', 'book', 'shy', 'star'];
-    document.getElementById('loading-img').src = IMG[loadingImgs[Math.floor(Math.random() * loadingImgs.length)]];
-    showLoading('正在识别图片文字...');
-
-    let extractedText = '';
-    try {
-      const worker = await T.createWorker('chi_sim+eng');
-      const { data } = await worker.recognize(base64);
-      extractedText = data.text.trim();
-      console.log('[截图记账] OCR 提取文字:', extractedText);
-      await worker.terminate();
-    } catch (ocrErr) {
-      console.error('[截图记账] OCR 失败:', ocrErr);
-      hideLoading();
-      showToast('图片文字识别失败，请确保图片清晰');
-      haptic('error');
-      return;
-    }
-
-    if (!extractedText) {
-      hideLoading();
-      showToast('图片中未识别到文字，请确保截图清晰');
-      haptic('error');
-      return;
-    }
-
-    // 第二步：用已有的文本解析接口处理 OCR 结果
-    showLoading('小芒狗在整理账单...');
-    const result = await callDeepSeek(extractedText, STATE.currentType);
-    hideLoading();
-
-    if (!result || result.length === 0) {
-      showToast('未能从图片中解析出账单，试试手动输入吧');
-      haptic('error');
-      return;
-    }
-
-    const today = new Date().toISOString().slice(0, 10);
-    const catList = STATE.currentType === 'income' ? INC_CAT_LIST : CAT_LIST;
-    const defaultCat = STATE.currentType === 'income' ? '其他收入' : '其他';
-
-    STATE.parsedTemp = result.map(r => {
-      let cat = r.category;
-      if (!catList.includes(cat)) {
-        cat = STATE.currentType === 'expense' ? localGuessCategory(r.desc || '') : defaultCat;
-      }
-      return {
-        desc: r.desc || '其他',
-        category: cat,
-        amount: Number(r.amount) || 0,
-        date: r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : today,
-        type: STATE.currentType
-      };
-    });
-
-    renderParseResult();
-    document.getElementById('modalParse').classList.add('show');
-  };
-  reader.readAsDataURL(file);
-  document.getElementById('screenshotInput').value = '';
 }
 
 async function parseAndShow() {
