@@ -435,6 +435,12 @@ html, body {
   filter: none;
   transform: scale(1.08);
 }
+.input-tab.screenshot-tab {
+  background: linear-gradient(135deg, var(--mango-light), var(--mango));
+  color: var(--ink);
+  font-size: 12px;
+}
+.input-tab.screenshot-tab:active { transform: scale(0.95); }
 
 /* 录音按钮区 */
 .input-area-voice {
@@ -1913,7 +1919,12 @@ html, body {
             <img src="" id="tabTextImg" alt="">
             <span>文字</span>
           </div>
+          <div class="input-tab screenshot-tab" data-tab="shot" onclick="openScreenshot()">
+            <span style="font-size:18px">📷</span>
+            <span>截图记账</span>
+          </div>
         </div>
+        <input type="file" id="screenshotInput" style="display:none" accept="image/*" onchange="handleScreenshotFile(this.files[0])">
 
         <div class="input-area-voice" id="tab-voice">
           <div class="record-wrap" id="recordWrap">
@@ -2540,10 +2551,10 @@ function calcStreak() {
 }
 
 // ===== Tab 切换 =====
-document.querySelectorAll('.input-tab').forEach(tab => {
+document.querySelectorAll('.input-tab:not(.screenshot-tab)').forEach(tab => {
   tab.addEventListener('click', () => {
     const t = tab.dataset.tab;
-    document.querySelectorAll('.input-tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.input-tab:not(.screenshot-tab)').forEach(x => x.classList.remove('active'));
     tab.classList.add('active');
     document.getElementById('tab-voice').style.display = t === 'voice' ? 'flex' : 'none';
     document.getElementById('tab-text').style.display = t === 'text' ? 'block' : 'none';
@@ -2738,6 +2749,114 @@ async function callDeepSeek(text, type) {
   } catch (err) {
     console.error(err);
     showToast('解析失败：' + err.message);
+    return null;
+  }
+}
+
+// ===== 截图记账 =====
+function openScreenshot() {
+  document.getElementById('screenshotInput').click();
+}
+
+async function handleScreenshotFile(file) {
+  if (!file) return;
+  haptic('light');
+
+  // 转 base64
+  const reader = new FileReader();
+  reader.onload = async function() {
+    const base64 = reader.result; // data:image/...;base64,...
+    const loadingImgs = ['paint', 'book', 'shy', 'star'];
+    document.getElementById('loading-img').src = IMG[loadingImgs[Math.floor(Math.random() * loadingImgs.length)]];
+    showLoading('小芒狗在看图识别...');
+
+    const result = await callDeepSeekVision(base64, STATE.currentType);
+    hideLoading();
+
+    if (!result || result.length === 0) {
+      showToast('图片没识别到账单内容，试试文字输入吧');
+      haptic('error');
+      return;
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const catList = STATE.currentType === 'income' ? INC_CAT_LIST : CAT_LIST;
+    const defaultCat = STATE.currentType === 'income' ? '其他收入' : '其他';
+
+    STATE.parsedTemp = result.map(r => {
+      let cat = r.category;
+      if (!catList.includes(cat)) {
+        cat = STATE.currentType === 'expense' ? localGuessCategory(r.desc || '') : defaultCat;
+      }
+      return {
+        desc: r.desc || '其他',
+        category: cat,
+        amount: Number(r.amount) || 0,
+        date: r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : today,
+        type: STATE.currentType
+      };
+    });
+
+    renderParseResult();
+    document.getElementById('modalParse').classList.add('show');
+  };
+  reader.readAsDataURL(file);
+  // 重置 input 以便同一文件可重复选
+  document.getElementById('screenshotInput').value = '';
+}
+
+async function callDeepSeekVision(base64Data, type) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast('请先在设置里填入 DeepSeek API Key');
+    document.querySelector('.tab-item[data-page="settings"]').click();
+    return null;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const dayBefore = new Date(Date.now() - 86400000*2).toISOString().slice(0, 10);
+
+  const catList = type === 'income' ? INC_CAT_LIST : CAT_LIST;
+
+  const textPrompt = `你是记账助手。分析这张图片，把里面显示的消费或收入记录解析成 JSON 数组。
+每条包含：desc（简短描述，10字内）、category（分类）、amount（数字）、date（YYYY-MM-DD 格式）。
+分类只能从这些里选：${catList.join('、')}。
+日期参考：今天=${today}，昨天=${yesterday}，前天=${dayBefore}。
+如果图片中没明确时间，date 用 ${today}。
+如果图片不是账单/支付截图，返回空数组 []。
+只返回 JSON 数组，不要任何其他文字、不要 markdown 代码块。`;
+
+  try {
+    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: 'deepseek-v4-pro',
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: textPrompt },
+              { type: 'image_url', image_url: { url: base64Data } }
+            ]
+          }
+        ],
+        temperature: 0.2
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.text();
+      throw new Error('API ' + resp.status + ': ' + err.slice(0, 100));
+    }
+    const data = await resp.json();
+    let content = data.choices[0].message.content.trim();
+    content = content.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+    const parsed = JSON.parse(content);
+    if (!Array.isArray(parsed)) throw new Error('返回格式不对');
+    return parsed;
+  } catch (err) {
+    console.error(err);
+    showToast('图片识别失败：' + err.message);
     return null;
   }
 }
