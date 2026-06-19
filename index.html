@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="小芒狗">
 <meta name="theme-color" content="#FFF8E7">
 <link rel="manifest" href="manifest.json">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <title>小芒狗记账</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
@@ -2762,20 +2763,52 @@ async function handleScreenshotFile(file) {
   if (!file) return;
   haptic('light');
 
-  // 转 base64
   const reader = new FileReader();
   reader.onload = async function() {
-    const base64 = reader.result; // data:image/...;base64,...
-    console.log('[截图记账] 图片大小:', (base64.length / 1024).toFixed(1), 'KB, MIME头:', base64.slice(0, 50));
+    const base64 = reader.result;
+    console.log('[截图记账] 图片大小:', (base64.length / 1024).toFixed(1), 'KB');
+
+    // 第一步：OCR 提取文字
+    const T = window.Tesseract;
+    if (!T) {
+      showToast('OCR 引擎加载中，请稍后再试');
+      haptic('error');
+      return;
+    }
+
     const loadingImgs = ['paint', 'book', 'shy', 'star'];
     document.getElementById('loading-img').src = IMG[loadingImgs[Math.floor(Math.random() * loadingImgs.length)]];
-    showLoading('小芒狗在看图识别...');
+    showLoading('正在识别图片文字...');
 
-    const result = await callDeepSeekVision(base64, STATE.currentType);
+    let extractedText = '';
+    try {
+      const worker = await T.createWorker('chi_sim+eng');
+      const { data } = await worker.recognize(base64);
+      extractedText = data.text.trim();
+      console.log('[截图记账] OCR 提取文字:', extractedText);
+      await worker.terminate();
+    } catch (ocrErr) {
+      console.error('[截图记账] OCR 失败:', ocrErr);
+      hideLoading();
+      showToast('图片文字识别失败，请确保图片清晰');
+      haptic('error');
+      return;
+    }
+
+    if (!extractedText) {
+      hideLoading();
+      showToast('图片中未识别到文字，请确保截图清晰');
+      haptic('error');
+      return;
+    }
+
+    // 第二步：用已有的文本解析接口处理 OCR 结果
+    showLoading('小芒狗在整理账单...');
+    const result = await callDeepSeek(extractedText, STATE.currentType);
     hideLoading();
 
-    if (!result) {
-      // callDeepSeekVision 已显示具体错误 toast，这里不再重复
+    if (!result || result.length === 0) {
+      showToast('未能从图片中解析出账单，试试手动输入吧');
       haptic('error');
       return;
     }
@@ -2802,86 +2835,7 @@ async function handleScreenshotFile(file) {
     document.getElementById('modalParse').classList.add('show');
   };
   reader.readAsDataURL(file);
-  // 重置 input 以便同一文件可重复选
   document.getElementById('screenshotInput').value = '';
-}
-
-async function callDeepSeekVision(base64Data, type) {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    showToast('请先在设置里填入 DeepSeek API Key');
-    document.querySelector('.tab-item[data-page="settings"]').click();
-    return null;
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const dayBefore = new Date(Date.now() - 86400000*2).toISOString().slice(0, 10);
-
-  const catList = type === 'income' ? INC_CAT_LIST : CAT_LIST;
-
-  const textPrompt = `你是一个专业的记账助手，擅长从支付截图（微信支付、支付宝等）中提取账单信息。
-
-请仔细阅读图片中的每一行文字，把你能找到的每一笔消费/收入都解析出来，返回 JSON 数组。
-每条记录包含：
-- desc: 简短描述（取商户名或商品名，10字以内）
-- category: 从以下分类中选最合适的：${catList.join('、')}
-- amount: 金额数字
-- date: YYYY-MM-DD 格式
-
-重要规则：
-1. 日期参考：今天=${today}，昨天=${yesterday}，前天=${dayBefore}
-2. 如果图片中有明确时间，用那个时间；否则用 ${today}
-3. 微信支付的"收款方"或"商户"就是 desc 来源
-4. 金额单位是"元"，看到"¥"或"￥"后面的数字就是金额
-5. 只要图片中有任何金额信息，就一定要提取出来，不要遗漏
-6. 即使图片模糊或不完整，也尽量提取你能识别到的内容
-
-返回格式示例（只返回 JSON，无 markdown）：
-[{"desc":"麦当劳","category":"餐饮","amount":35.0,"date":"${today}"}]`;
-
-  try {
-    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-      body: JSON.stringify({
-        model: 'deepseek-v4-pro',
-        messages: [
-          {
-            role: 'user',
-            content: textPrompt + '\n[图片数据已附加，请直接解析]',
-            image: base64Data
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 2048
-      })
-    });
-    console.log('[截图记账] HTTP状态:', resp.status);
-    if (!resp.ok) {
-      const err = await resp.text();
-      console.error('[截图记账] 响应体:', err.slice(0, 500));
-      throw new Error('HTTP ' + resp.status + ': ' + err.slice(0, 200));
-    }
-    const data = await resp.json();
-    console.log('[截图记账] API完整响应:', JSON.stringify(data).slice(0, 500));
-    let content = data.choices[0].message.content.trim();
-    console.log('[截图记账] 模型返回内容:', content);
-    content = content.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-    let parsed;
-    try {
-      parsed = JSON.parse(content);
-    } catch (e) {
-      console.error('[截图记账] JSON解析失败，原始内容:', content);
-      throw new Error('识别结果格式异常，请重试');
-    }
-    if (!Array.isArray(parsed)) throw new Error('返回格式不是数组');
-    if (parsed.length === 0) throw new Error('图片中未发现账单记录');
-    return parsed;
-  } catch (err) {
-    console.error('[截图记账] 失败:', err.message);
-    showToast('识别失败：' + err.message);
-    return null;
-  }
 }
 
 async function parseAndShow() {
