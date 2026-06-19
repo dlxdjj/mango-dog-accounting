@@ -689,11 +689,13 @@ html, body {
 .mom-icon { width: 31px; height: 31px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .mom-icon img { width: 24px; height: 24px; object-fit: contain; }
 .mom-name { flex: 1; font-size: 13px; color: var(--ink); min-width: 0; }
-.mom-amt { font-family: var(--font-cute); font-size: 15px; color: var(--ink); margin-right: 4px; white-space: nowrap; }
-.mom-delta { font-family: var(--font-cute); font-size: 11px; padding: 2px 8px; border-radius: 11px; text-align: center; white-space: nowrap; min-width: 52px; }
+.mom-amt { font-family: var(--font-cute); font-size: 15px; color: var(--ink); min-width: 72px; text-align: right; white-space: nowrap; }
+.mom-deltas { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.mom-delta { font-family: var(--font-cute); font-size: 11px; padding: 2px 8px; border-radius: 11px; white-space: nowrap; }
 .mom-delta.up { color: var(--expense); background: #FCE6E6; }
 .mom-delta.down { color: var(--income); background: #EAF6E0; }
-.mom-delta.flat { color: var(--ink-light); background: var(--bg-tint); }
+.mom-delta.new { color: var(--mango-deep); background: var(--mango-light); }
+.mom-delta-pct { font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
 
 .pay-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f8f2e6; }
 .pay-row:last-child { border-bottom: none; }
@@ -4497,17 +4499,17 @@ function renderCatMom(ym) {
     const diffAmt = cur - prev;
     const diffPct = prev > 0 ? Math.abs(((diffAmt / prev) * 100).toFixed(1)) : null;
 
-    let deltaCls = 'flat', deltaHtml = '—';
+    let deltaHtml = '';
     if (prev > 0) {
       if (diffAmt > 0.01) {
-        deltaCls = 'up';
-        deltaHtml = `↑ ¥${formatMoney(diffAmt)} ${diffPct}%`;
+        deltaHtml = `<span class="mom-delta up">↑ ¥${formatMoney(diffAmt)}</span>`;
+        if (diffPct > 0) deltaHtml += `<span class="mom-delta-pct up">${diffPct}%</span>`;
       } else if (diffAmt < -0.01) {
-        deltaCls = 'down';
-        deltaHtml = `↓ ¥${formatMoney(Math.abs(diffAmt))} ${diffPct}%`;
+        deltaHtml = `<span class="mom-delta down">↓ ¥${formatMoney(Math.abs(diffAmt))}</span>`;
+        if (diffPct > 0) deltaHtml += `<span class="mom-delta-pct down">${diffPct}%</span>`;
       }
     } else if (cur > 0) {
-      deltaHtml = '新增';
+      deltaHtml = `<span class="mom-delta new">新增</span>`;
     }
 
     return `
@@ -4515,7 +4517,7 @@ function renderCatMom(ym) {
         <div class="mom-icon" style="background:${cfg.color}22"><img src="${IMG[cfg.img]}" alt=""></div>
         <div class="mom-name">${cat}</div>
         <div class="mom-amt">¥${formatMoney(cur)}</div>
-        <div class="mom-delta ${deltaCls}">${deltaHtml}</div>
+        <div class="mom-deltas">${deltaHtml}</div>
       </div>`;
   }).join('');
 }
