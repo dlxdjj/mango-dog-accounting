@@ -2849,7 +2849,7 @@ async function callDeepSeekVision(base64Data, type) {
           {
             role: 'user',
             content: textPrompt,
-            image_url: { url: base64Data }
+            images: [base64Data]
           }
         ],
         temperature: 0.2,
