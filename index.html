@@ -2848,8 +2848,8 @@ async function callDeepSeekVision(base64Data, type) {
         messages: [
           {
             role: 'user',
-            content: textPrompt,
-            images: [base64Data]
+            content: textPrompt + '\n[图片数据已附加，请直接解析]',
+            image: base64Data
           }
         ],
         temperature: 0.2,
