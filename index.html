@@ -2766,6 +2766,7 @@ async function handleScreenshotFile(file) {
   const reader = new FileReader();
   reader.onload = async function() {
     const base64 = reader.result; // data:image/...;base64,...
+    console.log('[截图记账] 图片大小:', (base64.length / 1024).toFixed(1), 'KB, MIME头:', base64.slice(0, 50));
     const loadingImgs = ['paint', 'book', 'shy', 'star'];
     document.getElementById('loading-img').src = IMG[loadingImgs[Math.floor(Math.random() * loadingImgs.length)]];
     showLoading('小芒狗在看图识别...');
@@ -2855,13 +2856,16 @@ async function callDeepSeekVision(base64Data, type) {
         max_tokens: 2048
       })
     });
+    console.log('[截图记账] HTTP状态:', resp.status);
     if (!resp.ok) {
       const err = await resp.text();
+      console.error('[截图记账] 响应体:', err.slice(0, 500));
       throw new Error('HTTP ' + resp.status + ': ' + err.slice(0, 200));
     }
     const data = await resp.json();
+    console.log('[截图记账] API完整响应:', JSON.stringify(data).slice(0, 500));
     let content = data.choices[0].message.content.trim();
-    console.log('[截图记账] 原始返回:', content);
+    console.log('[截图记账] 模型返回内容:', content);
     content = content.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
     let parsed;
     try {
