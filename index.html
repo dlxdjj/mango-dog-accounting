@@ -4409,23 +4409,25 @@ function renderSummaryAnalysis(ym) {
   const net = totalInc - totalExp;
   const saveRate = totalInc > 0 ? ((net / totalInc) * 100).toFixed(1) : null;
 
-  // 储蓄率环比
+  // 储蓄率环比（百分点差）
   const [sy, sm] = ym.split('-').map(Number);
   const prevSM = sm === 1 ? 12 : sm - 1;
   const prevSY = sm === 1 ? sy - 1 : sy;
-  const prevYm = prevSY + '-' + String(prevSM).padStart(2, '0');
-  const prevBills = STATE.bills.filter(b => b.date.startsWith(prevYm));
+  const prevYm2 = prevSY + '-' + String(prevSM).padStart(2, '0');
+  const prevBills = STATE.bills.filter(b => b.date.startsWith(prevYm2));
   const prevInc = prevBills.filter(b => b.type === 'income').reduce((s, x) => s + x.amount, 0);
   const prevExp = prevBills.filter(b => b.type === 'expense').reduce((s, x) => s + x.amount, 0);
   const prevNet = prevInc - prevExp;
-  const prevRate = prevInc > 0 ? ((prevNet / prevInc) * 100).toFixed(1) : null;
+  const prevRate = prevInc > 0 ? parseFloat(((prevNet / prevInc) * 100).toFixed(1)) : null;
+  const curRateNum = saveRate !== null ? parseFloat(saveRate) : null;
 
   let changeHtml = '';
-  if (saveRate !== null && prevRate !== null) {
-    const diff = (saveRate - prevRate).toFixed(1);
-    if (diff > 0) changeHtml = `<span class="save-change up">↑ ${Math.abs(diff)}%</span>`;
-    else if (diff < 0) changeHtml = `<span class="save-change down">↓ ${Math.abs(diff)}%</span>`;
-    else changeHtml = `<span class="save-change flat">持平</span>`;
+  if (curRateNum !== null && prevRate !== null) {
+    const diff = (curRateNum - prevRate).toFixed(1);
+    const absDiff = Math.abs(parseFloat(diff));
+    if (absDiff < 0.1) changeHtml = `<span class="save-change flat">持平</span>`;
+    else if (parseFloat(diff) > 0) changeHtml = `<span class="save-change up">↑ ${absDiff}pp</span>`;
+    else changeHtml = `<span class="save-change down">↓ ${absDiff}pp</span>`;
   }
 
   const rateDisplay = saveRate !== null ? `${saveRate}<small style="font-size:13px">%</small>` : '—';
@@ -4492,9 +4494,9 @@ function renderTrend6m() {
 
 function renderCatMom(ym) {
   const [y, m] = ym.split('-').map(Number);
-  const prevM = m === 0 ? 11 : m - 1;
-  const prevY = m === 0 ? y - 1 : y;
-  const prevYm = prevY + '-' + String(prevM + 1).padStart(2, '0');
+  const prevM = m === 1 ? 12 : m - 1;
+  const prevY = m === 1 ? y - 1 : y;
+  const prevYm = prevY + '-' + String(prevM).padStart(2, '0');
 
   const curBills = STATE.bills.filter(b => b.date.startsWith(ym) && b.type === 'expense');
   const prevBills = STATE.bills.filter(b => b.date.startsWith(prevYm) && b.type === 'expense');
@@ -4521,17 +4523,23 @@ function renderCatMom(ym) {
     if (diffAmt > 0) { changeCls = 'up'; changeSign = '↑'; }
     else if (diffAmt < 0) { changeCls = 'down'; changeSign = '↓'; }
 
-    const diffText = prev > 0
-      ? `${changeSign} ¥${formatMoney(Math.abs(diffAmt))}`
-      : (cur > 0 ? '新增' : '无变化');
-    const pctText = prev > 0 ? ` ${Math.abs(diffPct)}%` : '';
+    let diffText = '';
+    if (prev > 0 && Math.abs(diffAmt) > 0.01) {
+      diffText = `${changeSign} ¥${formatMoney(Math.abs(diffAmt))}`;
+    } else if (prev === 0 && cur > 0) {
+      diffText = '新增';
+    } else if (prev > 0 && Math.abs(diffAmt) <= 0.01) {
+      diffText = '无变化';
+    }
+    const pctText = (prev > 0 && Math.abs(parseFloat(diffPct)) > 0.1) ? ` ${Math.abs(diffPct)}%` : '';
 
+    const showDiff = diffText || (prev === 0 && cur === 0);
     return `
       <div class="mom-row" onclick="showCategoryDetail('${cat}')">
         <div class="mom-icon"><img src="${IMG[cfg.img]}" alt=""></div>
         <div class="mom-info">
           <div class="mom-name">${cat}</div>
-          <div class="mom-sub">${diffText}${pctText}</div>
+          ${showDiff ? `<div class="mom-sub ${changeCls}">${diffText}${pctText}</div>` : ''}
         </div>
         <div class="mom-amt">¥${formatMoney(cur)}</div>
       </div>`;
