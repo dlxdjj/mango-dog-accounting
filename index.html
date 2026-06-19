@@ -2550,34 +2550,47 @@ async function pullAndMerge() {
     const { data, error } = await sb.from('transactions')
       .select('*').eq('user_id', supabaseUser.id).order('updated_at', { ascending: false });
     if (error) throw error;
-    if (!data || data.length === 0) { migrateLocalToCloud(); return; }
+    const cloudMap = {};
+    if (data) data.forEach(row => { cloudMap[row.id] = row; });
 
     const localMap = {};
     STATE.bills.forEach(b => { localMap[b.id] = b; });
 
     let changed = false;
-    data.forEach(row => {
-      const local = localMap[row.id];
-      if (row.deleted) {
-        if (local) { STATE.bills = STATE.bills.filter(b => b.id !== row.id); changed = true; }
-      } else if (!local) {
-        STATE.bills.push({
-          id: row.id, ts: row.client_ts || Date.now(),
-          type: row.type, category: row.category,
-          amount: Number(row.amount), desc: row.description,
-          date: row.date, pay_method: row.pay_method || 'wechat'
-        });
-        changed = true;
-      } else if (new Date(row.updated_at).getTime() > local.ts) {
-        Object.assign(local, {
-          type: row.type, category: row.category,
-          amount: Number(row.amount), desc: row.description,
-          date: row.date, pay_method: row.pay_method || 'wechat',
-          ts: new Date(row.updated_at).getTime()
-        });
-        changed = true;
+
+    // 云端 → 本地：拉取新/更新的账单
+    if (data) {
+      data.forEach(row => {
+        const local = localMap[row.id];
+        if (row.deleted) {
+          if (local) { STATE.bills = STATE.bills.filter(b => b.id !== row.id); changed = true; }
+        } else if (!local) {
+          STATE.bills.push({
+            id: row.id, ts: row.client_ts || Date.now(),
+            type: row.type, category: row.category,
+            amount: Number(row.amount), desc: row.description,
+            date: row.date, pay_method: row.pay_method || 'wechat'
+          });
+          changed = true;
+        } else if (new Date(row.updated_at).getTime() > local.ts) {
+          Object.assign(local, {
+            type: row.type, category: row.category,
+            amount: Number(row.amount), desc: row.description,
+            date: row.date, pay_method: row.pay_method || 'wechat',
+            ts: new Date(row.updated_at).getTime()
+          });
+          changed = true;
+        }
+      });
+    }
+
+    // 本地 → 云端：推送云端没有的账单
+    for (const b of STATE.bills) {
+      if (!cloudMap[b.id]) {
+        await syncBillToCloud(b);
       }
-    });
+    }
+
     if (changed) { saveBillsToStorage(); renderHome(); }
   } catch (e) { console.warn('Pull/merge failed:', e.message); }
 }
