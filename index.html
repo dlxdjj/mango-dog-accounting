@@ -634,6 +634,28 @@ html, body {
   font-family: var(--font-cute); letter-spacing: 0.5px; line-height: 1.8;
 }
 
+/* ========== 日历/分析 分段切换 ========== */
+.subtoggle {
+  display: flex; background: var(--bg-tint); border-radius: 16px; padding: 5px;
+  margin: 4px 2px 16px; position: relative;
+}
+.subtoggle-item {
+  flex: 1; text-align: center; font-family: var(--font-cute); font-size: 14px;
+  color: var(--ink-soft); padding: 9px 0; border-radius: 12px; cursor: pointer;
+  z-index: 2; transition: color 0.25s; display: flex; align-items: center;
+  justify-content: center; gap: 5px;
+}
+.subtoggle-item.on { color: var(--ink); }
+.subtoggle-slider {
+  position: absolute; top: 5px; left: 5px; width: calc(50% - 5px); height: calc(100% - 10px);
+  background: var(--paper); border-radius: 12px; box-shadow: 0 2px 7px rgba(155,128,100,.14);
+  transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.subtoggle.ana .subtoggle-slider { transform: translateX(100%); }
+
+.subview { display: none; }
+.subview.on { display: block; animation: fadeIn 0.35s ease; }
+
 /* ========== 统计页 ========== */
 .stats-card {
   background: var(--paper); border-radius: var(--r-l);
@@ -764,6 +786,9 @@ html, body {
   margin-top: 1px;
   font-family: var(--font-cute);
 }
+.cal-amt-exp { font-size: 9px; color: var(--expense); margin-top: 1px; font-family: var(--font-cute); }
+.cal-amt-inc { font-size: 9px; color: var(--income); margin-top: 1px; font-family: var(--font-cute); }
+.cal-amt-row { display: flex; gap: 2px; flex-wrap: wrap; justify-content: center; }
 
 .cal-cell.today {
   background: linear-gradient(135deg, #FFE19E 0%, #FFD56B 100%);
@@ -775,7 +800,7 @@ html, body {
 }
 
 .cal-cell.over-budget {
-  background: rgba(255, 154, 154, 0.2);
+  background: rgba(230, 101, 101, 0.12);
   border: 1.5px solid #FFB5B5;
 }
 
@@ -1894,31 +1919,41 @@ html, body {
         <div class="review-arrow">›</div>
       </div>
 
-      <!-- 日历视图 -->
-      <div class="calendar-card">
-        <div class="stats-title">
-          <span>日历</span>
-          <div class="stats-month-picker">
-            <button id="calPrev">‹</button>
-            <span id="calMonthLabel">2026年5月</span>
-            <button id="calNext">›</button>
+      <!-- 日历 / 分析 切换 -->
+      <div class="subtoggle" id="statsToggle">
+        <div class="subtoggle-item on" data-view="calendar">📅 日历</div>
+        <div class="subtoggle-item" data-view="analysis">📊 分析</div>
+        <div class="subtoggle-slider"></div>
+      </div>
+
+      <!-- 日历子视图 -->
+      <div class="subview on" id="subview-calendar">
+        <div class="calendar-card">
+          <div class="stats-title">
+            <span>日历</span>
+            <div class="stats-month-picker">
+              <button id="calPrev">‹</button>
+              <span id="calMonthLabel">2026年5月</span>
+              <button id="calNext">›</button>
+            </div>
           </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
         </div>
-        <div class="calendar-grid" id="calendarGrid"></div>
       </div>
 
-      <!-- 月度分类 -->
-      <div class="stats-card">
-        <div class="stats-title">
-          <span>本月分类</span>
+      <!-- 分析子视图 -->
+      <div class="subview" id="subview-analysis">
+        <div class="stats-card">
+          <div class="stats-title">
+            <span>本月分类</span>
+          </div>
+          <div id="catStats"></div>
         </div>
-        <div id="catStats"></div>
-      </div>
 
-      <!-- 近 7 天 -->
-      <div class="stats-card">
-        <div class="stats-title">近 7 天</div>
-        <div id="weekStats"></div>
+        <div class="stats-card">
+          <div class="stats-title">近 7 天</div>
+          <div id="weekStats"></div>
+        </div>
       </div>
     </div>
 
@@ -2467,6 +2502,21 @@ document.querySelectorAll('.type-toggle-item').forEach(it => {
   });
 });
 
+// 统计页：日历 / 分析 切换
+document.getElementById('statsToggle').addEventListener('click', function(e) {
+  const item = e.target.closest('.subtoggle-item');
+  if (!item) return;
+  const view = item.dataset.view;
+  const toggle = document.getElementById('statsToggle');
+  document.querySelectorAll('#statsToggle .subtoggle-item').forEach(x => x.classList.remove('on'));
+  item.classList.add('on');
+  if (view === 'analysis') { toggle.classList.add('ana'); }
+  else { toggle.classList.remove('ana'); }
+  document.querySelectorAll('#page-stats .subview').forEach(s => s.classList.remove('on'));
+  document.getElementById('subview-' + view).classList.add('on');
+  haptic('light');
+});
+
 document.querySelectorAll('.tab-item').forEach(item => {
   item.addEventListener('click', () => {
     const page = item.dataset.page;
@@ -2478,6 +2528,12 @@ document.querySelectorAll('.tab-item').forEach(item => {
     if (page === 'stats') {
       renderCalendar();
       renderStats();
+      // 重置为日历视图
+      document.getElementById('statsToggle').classList.remove('ana');
+      document.querySelectorAll('#statsToggle .subtoggle-item').forEach(x => x.classList.remove('on'));
+      document.querySelector('#statsToggle .subtoggle-item[data-view="calendar"]').classList.add('on');
+      document.querySelectorAll('#page-stats .subview').forEach(s => s.classList.remove('on'));
+      document.getElementById('subview-calendar').classList.add('on');
     }
     if (page === 'settings') {
       document.getElementById('apiKeyInput').value = getApiKey();
@@ -3449,8 +3505,11 @@ function renderCalendar() {
     }
 
     let amtHtml = '';
-    if (info && info.expense > 0) {
-      amtHtml = `<div class="cal-amt">¥${formatMoneyShort(info.expense)}</div>`;
+    if (info) {
+      const parts = [];
+      if (info.income > 0) parts.push(`<span class="cal-amt-inc">+${formatMoneyShort(info.income)}</span>`);
+      if (info.expense > 0) parts.push(`<span class="cal-amt-exp">-${formatMoneyShort(info.expense)}</span>`);
+      if (parts.length) amtHtml = `<div class="cal-amt-row">${parts.join('')}</div>`;
     }
 
     cells.push(`
