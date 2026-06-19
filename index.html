@@ -2408,13 +2408,13 @@ html, body {
 // ===== Supabase 配置（由仓库作者填入）=====
 const SUPABASE_URL = 'https://roumfsghkwwnnvwyyeck.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJvdW1mc2doa3d3bm52d3l5ZWNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4OTMzMjQsImV4cCI6MjA5NzQ2OTMyNH0.udaWogOBtCnsX7i8Q8gi_LoO9Vd4qDizJswd4wSR5wE';
-let supabase = null;
+let sb = null;
 let syncQueue = JSON.parse(localStorage.getItem('mango_sync_queue') || '[]');
 let supabaseUser = null;
 
 function initSupabase() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
-  if (supabase) return true;
+  if (sb) return true;
   if (!window.supabase) {
     console.warn('Supabase SDK 未加载，动态加载中...');
     const s = document.createElement('script');
@@ -2424,8 +2424,8 @@ function initSupabase() {
     return false;
   }
   try {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    supabase.auth.onAuthStateChange((event, session) => {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    sb.auth.onAuthStateChange((event, session) => {
       supabaseUser = session ? session.user : null;
       updateSupabaseUI();
       if (supabaseUser) {
@@ -2434,7 +2434,7 @@ function initSupabase() {
       }
     });
     // 恢复已有 session
-    supabase.auth.getSession().then(({ data }) => {
+    sb.auth.getSession().then(({ data }) => {
       supabaseUser = data.session ? data.session.user : null;
       updateSupabaseUI();
       if (supabaseUser) { processSyncQueue(); pullAndMerge(); }
@@ -2446,14 +2446,14 @@ function initSupabase() {
 // ===== 认证 =====
 async function supabaseSignIn(email) {
   if (!initSupabase()) { showToast('请先配置 Supabase URL 和 Key'); return; }
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
   if (error) { showToast('登录失败: ' + error.message); }
   else { showToast('已发送登录链接到 ' + email + '，请查收邮箱', 'heart'); haptic('success'); }
 }
 
 async function supabaseSignOut() {
   if (!supabase) return;
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   supabaseUser = null;
   syncQueue = [];
   localStorage.removeItem('mango_sync_queue');
@@ -2465,7 +2465,7 @@ async function supabaseSignOut() {
 async function syncBillToCloud(bill) {
   if (!supabaseUser || !supabase) return;
   try {
-    const { error } = await supabase.from('transactions').upsert({
+    const { error } = await sb.from('transactions').upsert({
       id: bill.id,
       user_id: supabaseUser.id,
       type: bill.type,
@@ -2488,7 +2488,7 @@ async function syncBillToCloud(bill) {
 async function syncDeleteToCloud(billId) {
   if (!supabaseUser || !supabase) return;
   try {
-    const { error } = await supabase.from('transactions').upsert({
+    const { error } = await sb.from('transactions').upsert({
       id: billId,
       user_id: supabaseUser.id,
       deleted: true,
@@ -2505,7 +2505,7 @@ async function syncBudgetToCloud() {
   if (!supabaseUser || !supabase) return;
   const budget = getBudget();
   try {
-    const { error } = await supabase.from('user_settings').upsert({
+    const { error } = await sb.from('user_settings').upsert({
       user_id: supabaseUser.id,
       daily_budget: budget > 0 ? budget : null,
       data: { budget: budget },
@@ -2528,7 +2528,7 @@ async function processSyncQueue() {
   for (const item of queue) {
     try {
       if (item.action === 'delete') {
-        const { error } = await supabase.from('transactions').upsert({
+        const { error } = await sb.from('transactions').upsert({
           id: item.id, user_id: supabaseUser.id, deleted: true,
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' });
@@ -2547,7 +2547,7 @@ async function processSyncQueue() {
 async function pullAndMerge() {
   if (!supabaseUser || !supabase) return;
   try {
-    const { data, error } = await supabase.from('transactions')
+    const { data, error } = await sb.from('transactions')
       .select('*').eq('user_id', supabaseUser.id).order('updated_at', { ascending: false });
     if (error) throw error;
     if (!data || data.length === 0) { migrateLocalToCloud(); return; }
@@ -2592,7 +2592,7 @@ async function migrateLocalToCloud() {
       date: b.date, pay_method: b.pay_method || 'wechat',
       client_ts: b.ts, updated_at: new Date().toISOString(), deleted: false
     }));
-    const { error } = await supabase.from('transactions').upsert(rows, { onConflict: 'id' });
+    const { error } = await sb.from('transactions').upsert(rows, { onConflict: 'id' });
     if (error) throw error;
     localStorage.setItem('mango_migrated', '1');
     showToast('本地数据已同步到云端', 'heart');
