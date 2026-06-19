@@ -666,8 +666,16 @@ html, body {
   display: flex; align-items: center; gap: 10px; margin-top: 10px;
   padding-top: 10px; border-top: 1px dashed var(--line);
 }
-.save-rate { font-family: var(--font-cute); font-size: 22px; color: var(--sprout-deep); }
+.save-ava { width: 48px; height: auto; filter: drop-shadow(0 2px 3px rgba(107,85,68,.14)); }
+.save-info { flex: 1; }
 .save-label { font-size: 11px; color: var(--ink-soft); }
+.save-rate { font-family: var(--font-cute); font-size: 25px; color: var(--sprout-deep); line-height: 1; }
+.save-change {
+  font-family: var(--font-cute); font-size: 12px; padding: 3px 10px; border-radius: 12px;
+}
+.save-change.up { color: var(--income); background: #EAF6E0; }
+.save-change.down { color: var(--expense); background: #FCE6E6; }
+.save-change.flat { color: var(--ink-soft); background: var(--bg-tint); }
 
 .trend-bars { display: flex; gap: 6px; align-items: flex-end; height: 140px; padding: 0 2px; }
 .trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; height: 100%; }
@@ -695,6 +703,15 @@ html, body {
 .pay-amt { font-family: var(--font-cute); font-size: 13px; }
 .pay-debt { font-size: 10px; color: var(--expense); }
 .pay-pct { font-size: 10.5px; color: var(--ink-soft); min-width: 36px; text-align: right; }
+.pay-bar-wrap { display: flex; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 10px; gap: 2px; }
+.pay-bar-seg { height: 100%; border-radius: 3px; min-width: 4px; }
+.ana-strip {
+  display: flex; align-items: center; gap: 10px; background: #EAF6E0;
+  border-radius: var(--r-s); padding: 10px 13px; margin-bottom: 12px;
+}
+.ana-strip .em { font-family: var(--font-cute); color: var(--sprout-deep); font-size: 18px; }
+.ana-strip .tx { font-size: 11.5px; color: var(--ink-soft); line-height: 1.4; }
+.ana-strip .tx b { color: var(--sprout-deep); }
 
 /* ========== 统计页 ========== */
 .stats-card {
@@ -1979,16 +1996,18 @@ html, body {
           </div>
           <div class="calendar-grid" id="calendarGrid"></div>
         </div>
-      </div>
 
-      <!-- 分析子视图 -->
-      <div class="subview" id="subview-analysis">
         <div class="stats-card">
           <div class="stats-title">
             <span>本月分类</span>
           </div>
           <div id="catStats"></div>
         </div>
+      </div>
+
+      <!-- 分析子视图 -->
+      <div class="subview" id="subview-analysis">
+        <div id="anaStrip"></div>
 
         <div class="stats-card">
           <div class="stats-title">近 7 天</div>
@@ -4374,6 +4393,9 @@ const CREDIT_PAYS = PAY_LIST.filter(k => PAY_METHODS[k].isCredit);
 // ===== 分析模块渲染 =====
 function renderAnalysisModules() {
   const ym = STATE.calYear + '-' + String(STATE.calMonth + 1).padStart(2, '0');
+  // 顶部总结条
+  const stripEl = document.getElementById('anaStrip');
+  if (stripEl) stripEl.innerHTML = renderAnaStrip(ym);
   renderSummaryAnalysis(ym);
   renderTrend6m();
   renderCatMom(ym);
@@ -4385,7 +4407,26 @@ function renderSummaryAnalysis(ym) {
   const totalExp = monthBills.filter(b => b.type === 'expense').reduce((s, x) => s + x.amount, 0);
   const totalInc = monthBills.filter(b => b.type === 'income').reduce((s, x) => s + x.amount, 0);
   const net = totalInc - totalExp;
-  const saveRate = totalInc > 0 ? ((net / totalInc) * 100).toFixed(1) : '—';
+  const saveRate = totalInc > 0 ? ((net / totalInc) * 100).toFixed(1) : null;
+
+  // 储蓄率环比
+  const [y, m] = ym.split('-').map(Number);
+  let prevYm; if (m === 1) prevYm = (y-1)+'-12'; else prevYm = y+'-'+String(m).padStart(2,'0');
+  const prevBills = STATE.bills.filter(b => b.date.startsWith(prevYm));
+  const prevInc = prevBills.filter(b => b.type === 'income').reduce((s, x) => s + x.amount, 0);
+  const prevExp = prevBills.filter(b => b.type === 'expense').reduce((s, x) => s + x.amount, 0);
+  const prevNet = prevInc - prevExp;
+  const prevRate = prevInc > 0 ? ((prevNet / prevInc) * 100).toFixed(1) : null;
+
+  let changeHtml = '';
+  if (saveRate !== null && prevRate !== null) {
+    const diff = (saveRate - prevRate).toFixed(1);
+    if (diff > 0) changeHtml = `<span class="save-change up">↑ ${Math.abs(diff)}%</span>`;
+    else if (diff < 0) changeHtml = `<span class="save-change down">↓ ${Math.abs(diff)}%</span>`;
+    else changeHtml = `<span class="save-change flat">持平</span>`;
+  }
+
+  const rateDisplay = saveRate !== null ? `${saveRate}<small style="font-size:13px">%</small>` : '—';
 
   document.getElementById('summaryAnalysis').innerHTML = `
     <div class="sum3">
@@ -4393,12 +4434,15 @@ function renderSummaryAnalysis(ym) {
       <div class="sum3-sep"></div>
       <div class="sum3-col"><div class="lab">支出</div><div class="val val-exp">¥${formatMoney(totalExp)}</div></div>
       <div class="sum3-sep"></div>
-      <div class="sum3-col"><div class="lab">结余</div><div class="val val-net">¥${formatMoney(net)}</div></div>
+      <div class="sum3-col"><div class="lab">结余</div><div class="val val-net">${net>=0?'+':''}¥${formatMoney(net)}</div></div>
     </div>
     <div class="save-row">
-      <span style="font-size:12px;color:var(--ink-soft)">储蓄率</span>
-      <span class="save-rate">${saveRate}${saveRate!=='—'?'%':''}</span>
-      <span style="font-size:11px;color:var(--ink-light);margin-left:4px">结余÷收入</span>
+      <img class="save-ava" src="${IMG.mango}" alt="">
+      <div class="save-info">
+        <div class="save-label">本月储蓄率</div>
+        <span class="save-rate">${rateDisplay}</span>
+      </div>
+      ${changeHtml}
     </div>`;
 }
 
@@ -4485,6 +4529,18 @@ function renderCatMom(ym) {
   }).join('');
 }
 
+function renderAnaStrip(ym) {
+  const monthBills = STATE.bills.filter(b => b.date.startsWith(ym));
+  const totalInc = monthBills.filter(b => b.type === 'income').reduce((s, x) => s + x.amount, 0);
+  const totalExp = monthBills.filter(b => b.type === 'expense').reduce((s, x) => s + x.amount, 0);
+  const net = totalInc - totalExp;
+  const saveRate = totalInc > 0 ? ((net / totalInc) * 100).toFixed(1) : 0;
+  const msg = net >= 0
+    ? `本月结余 <b>+¥${formatMoney(net)}</b> · 储蓄率 <b>${saveRate}%</b>，比上月更会攒啦`
+    : `本月超支 <b>¥${formatMoney(-net)}</b>，下个月一起加油`;
+  return `<div class="ana-strip"><span class="em">${net >= 0 ? '＋' : '－'}</span><div class="tx">${msg}</div></div>`;
+}
+
 function renderPayMethods(ym) {
   const monthBills = STATE.bills.filter(b => b.date.startsWith(ym) && b.type === 'expense');
   const total = monthBills.reduce((s, x) => s + x.amount, 0);
@@ -4501,7 +4557,17 @@ function renderPayMethods(ym) {
   let creditTotal = 0;
   CREDIT_PAYS.forEach(k => { creditTotal += (pmSum[k] || 0); });
 
-  let html = sorted.map(([pm, sum]) => {
+  // 柱状图
+  let barHtml = '';
+  if (total > 0) {
+    barHtml = `<div class="pay-bar-wrap">${sorted.map(([pm, sum]) => {
+      const cfg = PAY_METHODS[pm] || PAY_METHODS['wechat'];
+      const pct = (sum / total * 100);
+      return `<div class="pay-bar-seg" style="width:${pct}%;background:${cfg.color}" title="${cfg.name} ${pct.toFixed(1)}%"></div>`;
+    }).join('')}</div>`;
+  }
+
+  let html = barHtml + sorted.map(([pm, sum]) => {
     const cfg = PAY_METHODS[pm] || PAY_METHODS['wechat'];
     const pct = total > 0 ? ((sum / total) * 100).toFixed(1) : '0';
     const debtNote = cfg.isCredit ? `<span class="pay-debt">待还</span>` : '';
