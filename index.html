@@ -2773,8 +2773,8 @@ async function handleScreenshotFile(file) {
     const result = await callDeepSeekVision(base64, STATE.currentType);
     hideLoading();
 
-    if (!result || result.length === 0) {
-      showToast('图片没识别到账单内容，试试文字输入吧');
+    if (!result) {
+      // callDeepSeekVision 已显示具体错误 toast，这里不再重复
       haptic('error');
       return;
     }
@@ -2827,7 +2827,7 @@ async function callDeepSeekVision(base64Data, type) {
 只返回 JSON 数组，不要任何其他文字、不要 markdown 代码块。`;
 
   try {
-    const resp = await fetch('https://api.deepseek.com/chat/completions', {
+    const resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
@@ -2841,22 +2841,31 @@ async function callDeepSeekVision(base64Data, type) {
             ]
           }
         ],
-        temperature: 0.2
+        temperature: 0.2,
+        max_tokens: 2048
       })
     });
     if (!resp.ok) {
       const err = await resp.text();
-      throw new Error('API ' + resp.status + ': ' + err.slice(0, 100));
+      throw new Error('HTTP ' + resp.status + ': ' + err.slice(0, 200));
     }
     const data = await resp.json();
     let content = data.choices[0].message.content.trim();
+    console.log('[截图记账] 原始返回:', content);
     content = content.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
-    const parsed = JSON.parse(content);
-    if (!Array.isArray(parsed)) throw new Error('返回格式不对');
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch (e) {
+      console.error('[截图记账] JSON解析失败，原始内容:', content);
+      throw new Error('识别结果格式异常，请重试');
+    }
+    if (!Array.isArray(parsed)) throw new Error('返回格式不是数组');
+    if (parsed.length === 0) throw new Error('图片中未发现账单记录');
     return parsed;
   } catch (err) {
-    console.error(err);
-    showToast('图片识别失败：' + err.message);
+    console.error('[截图记账] 失败:', err.message);
+    showToast('识别失败：' + err.message);
     return null;
   }
 }
