@@ -690,11 +690,11 @@ html, body {
 .mom-icon img { width: 22px; height: 22px; object-fit: contain; }
 .mom-info { flex: 1; min-width: 0; }
 .mom-name { font-size: 13px; color: var(--ink); }
-.mom-amt { font-family: var(--font-cute); font-size: 14px; }
-.mom-change { font-size: 10.5px; margin-left: 6px; }
-.mom-change.up { color: var(--expense); }
-.mom-change.down { color: var(--income); }
-.mom-change.flat { color: var(--ink-light); }
+.mom-sub { font-size: 10.5px; margin-top: 1px; }
+.mom-sub.up { color: var(--expense); }
+.mom-sub.down { color: var(--income); }
+.mom-sub.flat { color: var(--ink-light); }
+.mom-amt { font-family: var(--font-cute); font-size: 14px; white-space: nowrap; }
 
 .pay-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f8f2e6; }
 .pay-row:last-child { border-bottom: none; }
@@ -4410,8 +4410,10 @@ function renderSummaryAnalysis(ym) {
   const saveRate = totalInc > 0 ? ((net / totalInc) * 100).toFixed(1) : null;
 
   // 储蓄率环比
-  const [y, m] = ym.split('-').map(Number);
-  let prevYm; if (m === 1) prevYm = (y-1)+'-12'; else prevYm = y+'-'+String(m).padStart(2,'0');
+  const [sy, sm] = ym.split('-').map(Number);
+  const prevSM = sm === 1 ? 12 : sm - 1;
+  const prevSY = sm === 1 ? sy - 1 : sy;
+  const prevYm = prevSY + '-' + String(prevSM).padStart(2, '0');
   const prevBills = STATE.bills.filter(b => b.date.startsWith(prevYm));
   const prevInc = prevBills.filter(b => b.type === 'income').reduce((s, x) => s + x.amount, 0);
   const prevExp = prevBills.filter(b => b.type === 'expense').reduce((s, x) => s + x.amount, 0);
@@ -4467,16 +4469,20 @@ function renderTrend6m() {
 
   document.getElementById('trend6m').innerHTML = `
     <div class="trend-bars">
-      ${data.map(d => `
+      ${data.map(d => {
+        const showInc = d.inc > 0;
+        const showExp = d.exp > 0;
+        const topLabel = showExp ? '¥'+formatMoneyShort(d.exp) : (showInc ? '¥'+formatMoneyShort(d.inc) : '');
+        return `
         <div class="trend-col">
-          <div style="font-size:9px;color:var(--ink-light);height:10px;">${d.exp>0?'¥'+formatMoneyShort(d.exp):''}</div>
+          <div style="font-size:9px;color:var(--ink-light);height:10px;line-height:10px;">${topLabel}</div>
           <div class="trend-barset">
             <div class="trend-bar-inc" style="height:${d.inc/maxAmt*100}%"></div>
             <div class="trend-bar-exp" style="height:${d.exp/maxAmt*100}%"></div>
           </div>
           <div class="trend-label">${d.label}</div>
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
     </div>
     <div style="display:flex;gap:16px;justify-content:center;margin-top:8px;font-size:10px;color:var(--ink-soft)">
       <span><span style="display:inline-block;width:10px;height:10px;background:var(--income);border-radius:2px;vertical-align:middle;margin-right:4px"></span>收入</span>
@@ -4486,9 +4492,9 @@ function renderTrend6m() {
 
 function renderCatMom(ym) {
   const [y, m] = ym.split('-').map(Number);
-  let prevYm;
-  if (m === 1) { prevYm = (y - 1) + '-12'; }
-  else { prevYm = y + '-' + String(m).padStart(2, '0'); }
+  const prevM = m === 0 ? 11 : m - 1;
+  const prevY = m === 0 ? y - 1 : y;
+  const prevYm = prevY + '-' + String(prevM + 1).padStart(2, '0');
 
   const curBills = STATE.bills.filter(b => b.date.startsWith(ym) && b.type === 'expense');
   const prevBills = STATE.bills.filter(b => b.date.startsWith(prevYm) && b.type === 'expense');
@@ -4509,23 +4515,27 @@ function renderCatMom(ym) {
     const cfg = CATEGORIES[cat] || CATEGORIES['其他'];
     const cur = curSum[cat] || 0;
     const prev = prevSum[cat] || 0;
-    const diff = prev > 0 ? (((cur - prev) / prev) * 100).toFixed(1) : (cur > 0 ? '100' : '0');
+    const diffAmt = cur - prev;
+    const diffPct = prev > 0 ? ((diffAmt / prev) * 100).toFixed(1) : (cur > 0 ? '100' : '0');
     let changeCls = 'flat', changeSign = '';
-    if (prev > 0 && cur > prev) { changeCls = 'up'; changeSign = '↑'; }
-    else if (prev > 0 && cur < prev) { changeCls = 'down'; changeSign = '↓'; }
-    else if (prev === 0 && cur > 0) { changeCls = 'up'; changeSign = '↑'; }
+    if (diffAmt > 0) { changeCls = 'up'; changeSign = '↑'; }
+    else if (diffAmt < 0) { changeCls = 'down'; changeSign = '↓'; }
+
+    const diffText = prev > 0
+      ? `${changeSign} ¥${formatMoney(Math.abs(diffAmt))}`
+      : (cur > 0 ? '新增' : '无变化');
+    const pctText = prev > 0 ? ` ${Math.abs(diffPct)}%` : '';
 
     return `
       <div class="mom-row" onclick="showCategoryDetail('${cat}')">
         <div class="mom-icon"><img src="${IMG[cfg.img]}" alt=""></div>
         <div class="mom-info">
           <div class="mom-name">${cat}</div>
+          <div class="mom-sub">${diffText}${pctText}</div>
         </div>
-        <div class="mom-amt">
-          ¥${formatMoney(cur)}
-          <span class="mom-change ${changeCls}">${changeSign} ${Math.abs(diff)}%</span>
-        </div>
+        <div class="mom-amt">¥${formatMoney(cur)}</div>
       </div>`;
+  }).join('');
   }).join('');
 }
 
