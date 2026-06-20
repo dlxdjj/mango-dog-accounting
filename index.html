@@ -5277,51 +5277,71 @@ checkYearlyReport();
 // ===== Supabase 启动初始化 =====
 if (SUPABASE_URL && SUPABASE_ANON_KEY) { initSupabase(); }
 
-// PWA 从后台恢复时检查登录态（Safari 中 Magic Link 登录后切回 PWA）
-// 直接读 localStorage token 并用 setSession 恢复，绕过 SDK 内存缓存
-let sessionPollTimer = null;
-function restoreSessionFromStorage() {
+// PWA 登录态恢复：iOS 上 Safari 和 PWA localStorage 完全隔离
+// 改用 Cookie 做桥梁 + onAuthStateChange 自动处理
+// 方案：登录后 Set-Cookie，PWA 用 visibilitychange+focus 配合 SDK 自动恢复
+
+// Safari 登录完成后，把 token 写进 Cookie 供 PWA 读取
+function writeTokenToCookie(accessToken, refreshToken) {
+  const data = JSON.stringify({ at: accessToken, rt: refreshToken });
+  document.cookie = 'mango_auth=' + encodeURIComponent(data) + '; path=/; max-age=300; SameSite=Lax';
+}
+
+// PWA 从 Cookie 读 token 并恢复 session
+function restoreFromCookie() {
   if (supabaseUser) return;
+  const match = document.cookie.match(/(?:^|;\s*)mango_auth=([^;]*)/);
+  if (!match) return;
   try {
-    const projectRef = SUPABASE_URL.split('//')[1].split('.')[0];
-    const tokenKey = 'sb-' + projectRef + '-auth-token';
-    const raw = localStorage.getItem(tokenKey);
-    if (!raw) return;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !parsed.access_token || !parsed.refresh_token) return;
-    // 有完整的 token 对，直接恢复
+    const data = JSON.parse(decodeURIComponent(match[1]));
+    if (!data.at || !data.rt) return;
     if (!sb) { initSupabase(); }
     const doSet = () => {
       if (!sb) { setTimeout(doSet, 300); return; }
-      sb.auth.setSession({
-        access_token: parsed.access_token,
-        refresh_token: parsed.refresh_token
-      }).then(({ data }) => {
+      sb.auth.setSession({ access_token: data.at, refresh_token: data.rt }).then(({ data }) => {
         if (data.session) {
           supabaseUser = data.session.user;
           updateSupabaseUI();
           processSyncQueue();
           pullAndMerge();
+          // 用完清除 cookie
+          document.cookie = 'mango_auth=; path=/; max-age=0';
           showToast('欢迎回来，小小塔！', 'heart');
-          clearInterval(sessionPollTimer);
-          sessionPollTimer = null;
         }
       }).catch(() => {});
     };
     doSet();
   } catch(e) {}
 }
+
+// 在 initSupabase 的 onAuthStateChange 中写 Cookie
+const origInitSupabase = initSupabase;
+initSupabase = function() {
+  const result = origInitSupabase();
+  if (sb && !sb._cookieHooked) {
+    sb._cookieHooked = true;
+    sb.auth.onAuthStateChange((event, session) => {
+      if (session && session.access_token && session.refresh_token) {
+        writeTokenToCookie(session.access_token, session.refresh_token);
+      }
+    });
+  }
+  return result;
+};
+
+// PWA 检测：每 2 秒从 Cookie 恢复
+let sessionPollTimer = null;
 function startSessionPoll() {
   if (sessionPollTimer || supabaseUser) return;
   if (!sb) { initSupabase(); }
   sessionPollTimer = setInterval(() => {
     if (supabaseUser) { clearInterval(sessionPollTimer); sessionPollTimer = null; return; }
-    restoreSessionFromStorage();
+    restoreFromCookie();
   }, 2000);
 }
-const origUpdateSupabaseUI2 = updateSupabaseUI;
+const origUI3 = updateSupabaseUI;
 updateSupabaseUI = function() {
-  origUpdateSupabaseUI2();
+  origUI3();
   if (!supabaseUser && SUPABASE_URL && SUPABASE_ANON_KEY) startSessionPoll();
   if (supabaseUser && sessionPollTimer) { clearInterval(sessionPollTimer); sessionPollTimer = null; }
 };
