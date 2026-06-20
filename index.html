@@ -2462,7 +2462,7 @@ async function supabaseSignIn(email) {
 }
 
 async function supabaseSignOut() {
-  if (!supabase) return;
+  if (!sb) return;
   await sb.auth.signOut();
   supabaseUser = null;
   syncQueue = [];
@@ -2473,7 +2473,8 @@ async function supabaseSignOut() {
 
 // ===== 同步核心 =====
 async function syncBillToCloud(bill) {
-  if (!supabaseUser || !supabase) return;
+  if (!supabaseUser) return;
+  if (!sb) { initSupabase(); addToSyncQueue(bill.id, 'upsert'); return; }
   try {
     const { error } = await sb.from('transactions').upsert({
       id: bill.id,
@@ -2497,7 +2498,7 @@ async function syncBillToCloud(bill) {
 }
 
 async function syncDeleteToCloud(billId) {
-  if (!supabaseUser || !supabase) return;
+  if (!supabaseUser || !sb) return;
   try {
     const { error } = await sb.from('transactions').upsert({
       id: billId,
@@ -2513,7 +2514,7 @@ async function syncDeleteToCloud(billId) {
 }
 
 async function syncBudgetToCloud() {
-  if (!supabaseUser || !supabase) return;
+  if (!supabaseUser || !sb) return;
   const budget = getBudget();
   try {
     const { error } = await sb.from('user_settings').upsert({
@@ -2557,7 +2558,7 @@ async function processSyncQueue() {
 
 // ===== 云端拉取合并 =====
 async function pullAndMerge() {
-  if (!supabaseUser || !supabase) return;
+  if (!supabaseUser || !sb) return;
   try {
     const { data, error } = await sb.from('transactions')
       .select('*').eq('user_id', supabaseUser.id).order('updated_at', { ascending: false });
