@@ -5278,39 +5278,34 @@ checkYearlyReport();
 if (SUPABASE_URL && SUPABASE_ANON_KEY) { initSupabase(); }
 
 // PWA 从后台恢复时检查登录态（Safari 中 Magic Link 登录后切回 PWA）
-function tryRestoreSession() {
-  if (supabaseUser) return;
+// 每 2 秒轮询一次 session，登录成功后自动停止
+let sessionPollTimer = null;
+function startSessionPoll() {
+  if (sessionPollTimer || supabaseUser) return;
   if (!sb) { initSupabase(); }
-  const attempt = () => {
-    if (!sb) { setTimeout(attempt, 500); return; }
-    // 强刷 session，不读内存缓存
-    sb.auth.refreshSession().then(({ data }) => {
+  sessionPollTimer = setInterval(() => {
+    if (supabaseUser) { clearInterval(sessionPollTimer); sessionPollTimer = null; return; }
+    if (!sb) return;
+    sb.auth.getSession().then(({ data }) => {
       if (data.session) {
         supabaseUser = data.session.user;
         updateSupabaseUI();
         processSyncQueue();
         pullAndMerge();
         showToast('欢迎回来，小小塔！', 'heart');
+        clearInterval(sessionPollTimer);
+        sessionPollTimer = null;
       }
-    }).catch(() => {
-      // refreshSession 失败再试 getSession
-      sb.auth.getSession().then(({ data }) => {
-        if (data.session) {
-          supabaseUser = data.session.user;
-          updateSupabaseUI();
-          processSyncQueue();
-          pullAndMerge();
-          showToast('欢迎回来，小小塔！', 'heart');
-        }
-      });
-    });
-  };
-  attempt();
+    }).catch(() => {});
+  }, 2000);
 }
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') tryRestoreSession();
-});
-window.addEventListener('focus', tryRestoreSession);
+// 进入设置页且未登录时开始轮询
+const origUpdateSupabaseUI = updateSupabaseUI;
+updateSupabaseUI = function() {
+  origUpdateSupabaseUI();
+  if (!supabaseUser && SUPABASE_URL && SUPABASE_ANON_KEY) startSessionPoll();
+  if (supabaseUser && sessionPollTimer) { clearInterval(sessionPollTimer); sessionPollTimer = null; }
+};
 
 // 在 Safari（非 PWA）中登录成功后提示切回 PWA
 if (!window.matchMedia('(display-mode: standalone)').matches && SUPABASE_URL) {
