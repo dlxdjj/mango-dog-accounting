@@ -2101,7 +2101,7 @@ html, body {
 
       <div class="settings-card about-card">
         <img id="about-img" alt="">
-        <div style="font-family: var(--font-cute); font-size: 17px; color: var(--ink); letter-spacing: 1px">小芒狗记账 v2.0</div>
+        <div style="font-family: var(--font-cute); font-size: 17px; color: var(--ink); letter-spacing: 1px">小小雷记账 V3.0</div>
         <div style="font-size: 12px; color: var(--ink-light); margin-top:4px">陪你一起好好生活</div>
       </div>
     </div>
@@ -2692,11 +2692,12 @@ IMG['avatar_school']='avatar-school.png';
 IMG['avatar_cool']='avatar-cool.png';
 IMG['avatar_winter']='avatar-winter.png';
 IMG['mango']='mango.png';
+IMG['aboutIcon']='about-icon.jpg';
 function setImg(id, name) { const el = document.getElementById(id); if (el && IMG[name]) el.src = IMG[name]; }
 
 // 初始化所有图片
 setImg('logo-img', 'normal');
-setImg('about-img', 'mango');
+setImg('about-img', 'aboutIcon');
 setImg('tabHomeImg', 'normal');
 setImg('tabStatsImg', 'camera');
 setImg('tabSettingsImg', 'glasses');
