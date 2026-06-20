@@ -5278,13 +5278,13 @@ checkYearlyReport();
 if (SUPABASE_URL && SUPABASE_ANON_KEY) { initSupabase(); }
 
 // PWA 从后台恢复时检查登录态（Safari 中 Magic Link 登录后切回 PWA）
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible' || supabaseUser) return;
+function tryRestoreSession() {
+  if (supabaseUser) return;
   if (!sb) { initSupabase(); }
-  // SDK 可能还在加载，轮询等待
-  const checkSession = () => {
-    if (!sb) { setTimeout(checkSession, 500); return; }
-    sb.auth.getSession().then(({ data }) => {
+  const attempt = () => {
+    if (!sb) { setTimeout(attempt, 500); return; }
+    // 强刷 session，不读内存缓存
+    sb.auth.refreshSession().then(({ data }) => {
       if (data.session) {
         supabaseUser = data.session.user;
         updateSupabaseUI();
@@ -5292,10 +5292,25 @@ document.addEventListener('visibilitychange', () => {
         pullAndMerge();
         showToast('欢迎回来，小小塔！', 'heart');
       }
+    }).catch(() => {
+      // refreshSession 失败再试 getSession
+      sb.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          supabaseUser = data.session.user;
+          updateSupabaseUI();
+          processSyncQueue();
+          pullAndMerge();
+          showToast('欢迎回来，小小塔！', 'heart');
+        }
+      });
     });
   };
-  checkSession();
+  attempt();
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') tryRestoreSession();
 });
+window.addEventListener('focus', tryRestoreSession);
 
 // 在 Safari（非 PWA）中登录成功后提示切回 PWA
 if (!window.matchMedia('(display-mode: standalone)').matches && SUPABASE_URL) {
