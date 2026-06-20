@@ -2412,6 +2412,7 @@ let sb = null;
 let sbLoading = false;
 let syncQueue = JSON.parse(localStorage.getItem('mango_sync_queue') || '[]');
 let supabaseUser = null;
+let lastSyncTime = null;
 
 function initSupabase() {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return false;
@@ -2488,6 +2489,7 @@ async function syncBillToCloud(bill) {
       deleted: false
     }, { onConflict: 'id' });
     if (error) throw error;
+    lastSyncTime = Date.now();
   } catch (e) {
     console.warn('Sync upload failed, queuing:', e.message);
     addToSyncQueue(bill.id, 'upsert');
@@ -2547,6 +2549,7 @@ async function processSyncQueue() {
         if (bill) await syncBillToCloud(bill);
       }
       syncQueue = syncQueue.filter(q => q.id !== item.id || q.action !== item.action);
+      lastSyncTime = Date.now();
     } catch (e) { break; } // 失败则保留在队列，下次重试
   }
   localStorage.setItem('mango_sync_queue', JSON.stringify(syncQueue));
@@ -2634,7 +2637,15 @@ function updateSupabaseUI() {
   }
   card.style.display = '';
   if (supabaseUser) {
-    statusEl.innerHTML = `<span style="color:var(--sprout-deep)">● 已连接</span> ${supabaseUser.email}`;
+    let syncInfo = '';
+    if (syncQueue.length > 0) {
+      syncInfo = `<div style="font-size:11px;color:var(--mango-deep);margin-top:4px">⏳ 待同步 ${syncQueue.length} 条</div>`;
+    } else if (lastSyncTime) {
+      const secs = Math.floor((Date.now() - lastSyncTime) / 1000);
+      const ago = secs < 60 ? '刚刚' : secs < 3600 ? Math.floor(secs/60) + ' 分钟前' : Math.floor(secs/3600) + ' 小时前';
+      syncInfo = `<div style="font-size:11px;color:var(--sprout-deep);margin-top:4px">✓ 已同步 · ${ago}</div>`;
+    }
+    statusEl.innerHTML = `<span style="color:var(--sprout-deep)">● 已连接</span> ${supabaseUser.email}${syncInfo}`;
     document.getElementById('supabaseSignBtn').textContent = '登出';
     document.getElementById('supabaseSignBtn').onclick = supabaseSignOut;
   } else {
