@@ -2094,9 +2094,12 @@ html, body {
         <div class="settings-label">Supabase 云同步</div>
         <div style="font-size:11px;color:var(--ink-light);margin-bottom:8px">登录后自动同步，离线也能记</div>
         <input type="email" class="settings-input" id="supabaseEmail" placeholder="你的邮箱" style="margin-bottom:8px">
+        <div id="supabaseCodeWrap" style="display:none;margin-bottom:8px">
+          <input type="text" class="settings-input" id="supabaseCodeInput" placeholder="输入 6 位验证码" maxlength="6" inputmode="numeric" style="margin-bottom:0">
+        </div>
         <div id="supabaseStatus" style="font-size:12px;margin-bottom:8px"></div>
-        <button class="btn-primary" id="supabaseSignBtn" onclick="updateSupabaseUI()">登录 / 注册</button>
-        <div class="settings-tip">通过邮箱魔法链接登录，无需密码</div>
+        <button class="btn-primary" id="supabaseSignBtn" onclick="updateSupabaseUI()">发送验证码</button>
+        <div class="settings-tip">输入邮箱 → 发送验证码 → 输入验证码登录</div>
       </div>
 
       <div class="settings-card about-card">
@@ -2447,17 +2450,37 @@ function initSupabase() {
 }
 
 // ===== 认证 =====
-async function supabaseSignIn(email) {
+async function supabaseSendCode(email) {
   if (!initSupabase()) { showToast('请先配置 Supabase URL 和 Key'); return; }
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: {
-      shouldCreateUser: true,
-      emailRedirectTo: window.location.origin + window.location.pathname
-    }
+    options: { shouldCreateUser: true }
   });
-  if (error) { showToast('登录失败: ' + error.message); }
-  else { showToast('已发送登录链接到 ' + email + '，请查收邮箱', 'heart'); haptic('success'); }
+  if (error) { showToast('发送失败: ' + error.message); }
+  else {
+    showToast('验证码已发送到 ' + email, 'heart');
+    haptic('success');
+    document.getElementById('supabaseCodeWrap').style.display = '';
+    document.getElementById('supabaseEmail').disabled = true;
+    document.getElementById('supabaseSignBtn').textContent = '验证';
+    document.getElementById('supabaseSignBtn').onclick = () => {
+      const code = document.getElementById('supabaseCodeInput').value.trim();
+      if (!code) { showToast('请输入验证码'); return; }
+      supabaseVerifyOtp(email, code);
+    };
+  }
+}
+
+async function supabaseVerifyOtp(email, token) {
+  const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+  if (error) { showToast('验证失败: ' + error.message); }
+  else {
+    showToast('登录成功', 'heart');
+    haptic('success');
+    document.getElementById('supabaseCodeWrap').style.display = 'none';
+    document.getElementById('supabaseEmail').disabled = false;
+    document.getElementById('supabaseCodeInput').value = '';
+  }
 }
 
 async function supabaseSignOut() {
@@ -2466,6 +2489,9 @@ async function supabaseSignOut() {
   supabaseUser = null;
   syncQueue = [];
   localStorage.removeItem('mango_sync_queue');
+  document.getElementById('supabaseEmail').disabled = false;
+  document.getElementById('supabaseCodeWrap').style.display = 'none';
+  document.getElementById('supabaseCodeInput').value = '';
   updateSupabaseUI();
   showToast('已登出，数据仍在本地');
 }
@@ -2639,11 +2665,11 @@ function updateSupabaseUI() {
     document.getElementById('supabaseSignBtn').onclick = supabaseSignOut;
   } else {
     statusEl.innerHTML = '<span style="color:var(--ink-light)">○ 未登录</span>';
-    document.getElementById('supabaseSignBtn').textContent = '登录 / 注册';
+    document.getElementById('supabaseSignBtn').textContent = '发送验证码';
     document.getElementById('supabaseSignBtn').onclick = () => {
       const email = document.getElementById('supabaseEmail').value.trim();
       if (!email) { showToast('请输入邮箱'); return; }
-      supabaseSignIn(email);
+      supabaseSendCode(email);
     };
   }
 }
