@@ -33,7 +33,7 @@ mango.png           ← 通用吉祥物
 
 ### 3. Git 规范
 
-- 提交者：`dlxdjj`，邮箱 `1849337699@qq.com`
+- 提交者：`dlxdjj`
 - Commit message 用中文，简洁描述改了什么
 - 不要 `Co-Authored-By` 署名
 - 每个独立改动单独提交
