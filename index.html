@@ -2435,13 +2435,13 @@ function initSupabase() {
       if (supabaseUser) {
         processSyncQueue();
         pullAndMerge();
+        migrateLocalToCloud();  // Fix 6: 首次登录批量迁移
       }
     });
-    // 恢复已有 session
+    // Fix 2: 恢复已有 session — onAuthStateChange 已处理合并，不重复调用
     sb.auth.getSession().then(({ data }) => {
       supabaseUser = data.session ? data.session.user : null;
       updateSupabaseUI();
-      if (supabaseUser) { processSyncQueue(); pullAndMerge(); }
     });
     return true;
   } catch (e) { console.error('Supabase init failed:', e); return false; }
@@ -2499,12 +2499,21 @@ async function syncBillToCloud(bill) {
 
 async function syncDeleteToCloud(billId) {
   if (!supabaseUser || !sb) return;
+  const local = STATE.bills.find(b => b.id === billId);
   try {
+    // Fix 7: upsert 带完整字段，避免 NOT NULL 约束错误
     const { error } = await sb.from('transactions').upsert({
       id: billId,
       user_id: supabaseUser.id,
-      deleted: true,
-      updated_at: new Date().toISOString()
+      type: local ? local.type : 'expense',
+      category: local ? local.category : '其他',
+      amount: local ? local.amount : 0,
+      description: local ? local.desc : '',
+      date: local ? local.date : new Date().toISOString().slice(0, 10),
+      pay_method: local ? local.pay_method : 'wechat',
+      client_ts: local ? local.ts : Date.now(),
+      updated_at: new Date().toISOString(),
+      deleted: true
     }, { onConflict: 'id' });
     if (error) throw error;
   } catch (e) {
@@ -2524,7 +2533,10 @@ async function syncBudgetToCloud() {
       updated_at: new Date().toISOString()
     }, { onConflict: 'user_id' });
     if (error) throw error;
-  } catch (e) { console.warn('Budget sync failed:', e.message); }
+  } catch (e) {
+    console.warn('Budget sync failed, queuing:', e.message);
+    addToSyncQueue('budget', 'budget');  // Fix 8: 预算同步失败入队
+  }
 }
 
 // ===== 同步队列 =====
@@ -2535,10 +2547,17 @@ function addToSyncQueue(id, action) {
 }
 
 async function processSyncQueue() {
-  if (!supabaseUser || !supabase || syncQueue.length === 0) return;
+  // Fix 1: !supabase → !sb
+  if (!supabaseUser || !sb || syncQueue.length === 0) return;
   const queue = [...syncQueue];
   for (const item of queue) {
     try {
+      if (item.action === 'budget') {
+        await syncBudgetToCloud();
+        syncQueue = syncQueue.filter(q => q.action !== 'budget');
+        lastSyncTime = Date.now();
+        continue;
+      }
       if (item.action === 'delete') {
         const { error } = await sb.from('transactions').upsert({
           id: item.id, user_id: supabaseUser.id, deleted: true,
@@ -3516,6 +3535,7 @@ function saveEdit() {
   bill.amount = Number(document.getElementById('editAmt').value) || bill.amount;
   bill.date = document.getElementById('editDate').value || bill.date;
   bill.pay_method = document.getElementById('editPayMethod').value || 'wechat';
+  bill.ts = Date.now();  // Fix 3: 更新时间戳，防止云端旧版本覆盖本地编辑
   saveBillsToStorage();
   syncBillToCloud(bill);
   closeEdit();
@@ -5135,12 +5155,18 @@ function importData(e) {
       if (!d.bills || !Array.isArray(d.bills)) throw new Error();
       showConfirm('导入数据？', `将导入 ${d.bills.length} 笔账单`, () => {
         const existIds = new Set(STATE.bills.map(b => b.id));
+        const newBills = [];
         d.bills.forEach(b => {
           if (!b.type) b.type = 'expense';
-          if (!existIds.has(b.id)) STATE.bills.push(b);
+          if (!existIds.has(b.id)) { STATE.bills.push(b); newBills.push(b); }
         });
-        if (d.budget) localStorage.setItem('mango_daily_budget', String(d.budget));
+        if (d.budget) {
+          localStorage.setItem('mango_daily_budget', String(d.budget));
+          syncBudgetToCloud();  // Fix 5: 导入的预算同步到云端
+        }
         saveBillsToStorage();
+        // Fix 5: 导入的账单也同步到云端
+        newBills.forEach(b => syncBillToCloud(b));
         renderHome();
         showToast('导入成功');
         haptic('success');
@@ -5162,6 +5188,10 @@ function confirmClearAll() {
       }
     });
     localStorage.removeItem('mango_last_streak_celebrate');
+    // Fix 4: 清空同步队列和迁移标记
+    syncQueue = [];
+    localStorage.removeItem('mango_sync_queue');
+    localStorage.removeItem('mango_migrated');
     STATE.lastCelebratedStreak = 0;
     renderHome();
     showToast('已清空');
