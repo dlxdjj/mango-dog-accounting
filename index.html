@@ -5277,6 +5277,39 @@ checkYearlyReport();
 // ===== Supabase 启动初始化 =====
 if (SUPABASE_URL && SUPABASE_ANON_KEY) { initSupabase(); }
 
+// PWA 从后台恢复时检查登录态（Safari 中 Magic Link 登录后切回 PWA）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !supabaseUser && sb) {
+    sb.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        supabaseUser = data.session.user;
+        updateSupabaseUI();
+        processSyncQueue();
+        pullAndMerge();
+        showToast('欢迎回来，小小塔！', 'heart');
+      }
+    });
+  }
+});
+
+// 在 Safari（非 PWA）中登录成功后提示切回 PWA
+if (!window.matchMedia('(display-mode: standalone)').matches && SUPABASE_URL) {
+  setTimeout(() => {
+    if (sb) {
+      sb.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          const banner = document.createElement('div');
+          banner.style.cssText = 'position:fixed;top:0;left:0;right:0;background:var(--mango);color:var(--ink);padding:14px 20px;text-align:center;z-index:999;font-family:var(--font-cute);font-size:14px';
+          banner.textContent = '✓ 登录成功！请切回桌面上的小小雷记账 App';
+          banner.onclick = () => banner.remove();
+          document.body.appendChild(banner);
+          setTimeout(() => banner.remove(), 5000);
+        }
+      });
+    }
+  }, 2000);
+}
+
 // 在线恢复同步
 window.addEventListener('online', () => {
   if (supabaseUser) { processSyncQueue(); }
