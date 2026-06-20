@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="小小塔">
+<meta name="apple-mobile-web-app-title" content="小芒狗">
 <meta name="theme-color" content="#FFF8E7">
 <link rel="manifest" href="manifest.json">
-<title>小小塔记账</title>
+<title>小芒狗记账</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
 
@@ -912,7 +912,7 @@ html, body {
 
 .about-card { text-align: center; padding: 24px 20px; }
 .about-card img {
-  width: 300px; height: 300px; object-fit: contain;
+  width: 120px; height: 120px; object-fit: contain;
   margin-bottom: 10px; animation: floaty 3s ease-in-out infinite;
 }
 
@@ -1863,12 +1863,12 @@ html, body {
     <div class="app-title">
       <img id="logo-img" alt="">
       <span>
-        小小塔
+        小芒狗
         <span class="app-title-greeting" id="greeting"></span>
       </span>
     </div>
     <div class="top-actions">
-      <button class="icon-btn" onclick="openChat()" aria-label="问小小塔">
+      <button class="icon-btn" onclick="openChat()" aria-label="问小芒狗">
         <i class="ico-chat"></i>
       </button>
       <button class="icon-btn" onclick="openSearch()" aria-label="搜索">
@@ -1914,7 +1914,7 @@ html, body {
       <div class="input-section">
         <div class="input-title" id="inputTitle">
           <img class="title-mini-mascot" id="inputTitleImg" alt="">
-          <span id="inputTitleText">跟小小塔说说今天花了啥</span>
+          <span id="inputTitleText">跟小芒狗说说今天花了啥</span>
         </div>
 
         <!-- 收入/支出切换 -->
@@ -1954,7 +1954,7 @@ html, body {
 
         <button class="btn-primary" id="parseBtn" onclick="parseAndShow()">
           <i class="star"></i>
-          <span id="parseBtnText">让小小塔帮我整理</span>
+          <span id="parseBtnText">让小芒狗帮我整理</span>
           <i class="star"></i>
         </button>
       </div>
@@ -1977,7 +1977,7 @@ html, body {
           <img src="" id="reviewCardImg" alt="">
         </div>
         <div class="review-info">
-          <div class="review-title">小小塔复盘</div>
+          <div class="review-title">小芒狗复盘</div>
           <div class="review-sub" id="reviewCardSub">点一下，让我帮你看看这个月怎么样</div>
         </div>
         <div class="review-arrow">›</div>
@@ -2127,7 +2127,7 @@ html, body {
 <div class="modal-overlay" id="modalParse">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="parseModalTitle">小小塔整理好啦</div>
+    <div class="modal-title" id="parseModalTitle">小芒狗整理好啦</div>
     <div id="parseResultList"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeParseModal()">取消</button>
@@ -2140,7 +2140,7 @@ html, body {
 <div class="modal-overlay" id="modalLoading">
   <div class="modal center" style="max-width: 280px; text-align:center;">
     <div class="loading-mascot"><img id="loading-img" alt=""></div>
-    <div class="loading-text" id="loadingText">小小塔在思考...</div>
+    <div class="loading-text" id="loadingText">小芒狗在思考...</div>
   </div>
 </div>
 
@@ -2232,7 +2232,7 @@ html, body {
       <div class="notify-modal-title" id="notifyTitle">已在心里通知贾诗雷</div>
       <div class="notify-modal-sub" id="notifySub">
         记得真的去找他哦～<br>
-        不然小小塔会偷偷记下你今天偷懒不去领奖的事。
+        不然小芒狗会偷偷记下你今天偷懒不去领奖的事。
       </div>
     </div>
   </div>
@@ -2286,7 +2286,7 @@ html, body {
 <div class="modal-overlay" id="modalReview">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="reviewModalTitle">小小塔复盘</div>
+    <div class="modal-title" id="reviewModalTitle">小芒狗复盘</div>
     <div id="reviewContent" class="review-modal-content"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeReview()" style="flex:1">关闭</button>
@@ -2294,14 +2294,14 @@ html, body {
   </div>
 </div>
 
-<!-- 跟小小塔对话 -->
+<!-- 跟小芒狗对话 -->
 <div class="modal-overlay" id="modalChat">
   <div class="modal chat-modal">
     <div class="modal-handle"></div>
     <div class="chat-header">
       <img src="" id="chatHeaderImg" alt="">
       <div class="chat-header-text">
-        <div class="chat-header-title">问问小小塔</div>
+        <div class="chat-header-title">问问小芒狗</div>
         <div class="chat-header-sub">只能聊跟账单有关的事哦</div>
       </div>
       <button class="btn-cancel" style="padding:8px 14px; font-size:13px" onclick="closeChat()">关闭</button>
@@ -2877,7 +2877,7 @@ document.querySelectorAll('.type-toggle-item').forEach(it => {
       document.getElementById('parseBtnText').textContent = '记下这笔收入';
     } else {
       btn.classList.remove('income-btn');
-      document.getElementById('parseBtnText').textContent = '让小小塔帮我整理';
+      document.getElementById('parseBtnText').textContent = '让小芒狗帮我整理';
     }
     haptic('light');
   });
@@ -3075,7 +3075,7 @@ async function parseAndShow() {
   // 加载图随机
   const loadingImgs = ['paint', 'book', 'shy', 'star'];
   document.getElementById('loading-img').src = IMG[loadingImgs[Math.floor(Math.random() * loadingImgs.length)]];
-  showLoading('小小塔在思考...');
+  showLoading('小芒狗在思考...');
   haptic('light');
 
   const result = await callDeepSeek(text, STATE.currentType);
@@ -3288,7 +3288,7 @@ function renderBillList() {
     listEl.innerHTML = `
       <div class="empty-state">
         <img src="${IMG.flower}" alt="">
-        <div class="empty-state-text">还没账单呢～<br>对小小塔说一句话试试</div>
+        <div class="empty-state-text">还没账单呢～<br>对小芒狗说一句话试试</div>
       </div>`;
     return;
   }
@@ -3834,7 +3834,7 @@ function goFindJia() {
   document.getElementById('notifyImg').src = IMG.party;
   document.getElementById('notifyTitle').textContent = '已在心里通知贾诗雷！';
   document.getElementById('notifySub').innerHTML =
-    '记得真的去找他哦～<br>不然小小塔会偷偷记下你今天偷懒不去领奖的事。';
+    '记得真的去找他哦～<br>不然小芒狗会偷偷记下你今天偷懒不去领奖的事。';
   document.getElementById('modalNotify').classList.add('show');
   haptic('success');
 }
@@ -3846,11 +3846,11 @@ function showCelebrate(streak) {
   const imgs = ['party', 'sing', 'star', 'heart'];
   document.getElementById('celebrateImg').src = IMG[imgs[Math.min(Math.floor(streak/3), imgs.length-1)]];
   let title = '', sub = '';
-  if (streak === 3) { title = '连记 3 天啦'; sub = '小小塔为你鼓掌'; }
+  if (streak === 3) { title = '连记 3 天啦'; sub = '小芒狗为你鼓掌'; }
   else if (streak === 7) { title = '一周记账达成'; sub = '好习惯养成了'; }
   else if (streak === 14) { title = '半月坚持'; sub = '你真的很棒'; }
   else if (streak === 30) { title = '一个月啦'; sub = '记账小达人'; }
-  else if (streak === 60) { title = '两个月不间断'; sub = '小小塔超佩服你'; }
+  else if (streak === 60) { title = '两个月不间断'; sub = '小芒狗超佩服你'; }
   else if (streak === 100) { title = '100 天达成'; sub = '传说中的记账大师'; }
   document.getElementById('celebrateTitle').textContent = title;
   document.getElementById('celebrateSubtitle').textContent = sub;
@@ -4027,7 +4027,7 @@ function openReview() {
   const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
   const monthBills = STATE.bills.filter(b => b.date.startsWith(monthPrefix));
 
-  document.getElementById('reviewModalTitle').textContent = `${year}年${month+1}月 · 小小塔复盘`;
+  document.getElementById('reviewModalTitle').textContent = `${year}年${month+1}月 · 小芒狗复盘`;
 
   if (monthBills.length === 0) {
     document.getElementById('reviewContent').innerHTML = `
@@ -4050,7 +4050,7 @@ function renderReviewLoading() {
   document.getElementById('reviewContent').innerHTML = `
     <div class="review-loading">
       <img src="${IMG.book}" alt="">
-      <div class="review-loading-text">小小塔正在翻你的账本...</div>
+      <div class="review-loading-text">小芒狗正在翻你的账本...</div>
     </div>
   `;
 }
@@ -4121,7 +4121,7 @@ function computeReviewStats(year, month) {
   };
 }
 
-// ===== 跟小小塔对话 =====
+// ===== 跟小芒狗对话 =====
 const CHAT_QUICK_QS = [
   '本月奶茶花了多少',
   '最近一周哪天花得最多',
@@ -4139,7 +4139,7 @@ function openChat() {
 
   // 第一次打开：欢迎语
   if (chatHistory.length === 0) {
-    addChatMsg('bot', '汪～想问小小塔什么呢？\n（只能聊账单的事哦）');
+    addChatMsg('bot', '汪～想问小芒狗什么呢？\n（只能聊账单的事哦）');
   }
   renderChatQuick();
   setTimeout(() => document.getElementById('chatInput').focus(), 300);
@@ -4216,7 +4216,7 @@ async function askChat(question) {
   removeChatTyping();
 
   if (!intent) {
-    addChatMsg('bot', '小小塔有点迷糊，再说一遍？');
+    addChatMsg('bot', '小芒狗有点迷糊，再说一遍？');
     return;
   }
 
@@ -4372,7 +4372,7 @@ function executeChatIntent(intent) {
     const bills = filterBills(intent.filter);
     return { count: bills.length };
   }
-  return { reply: '小小塔没看懂这个问题' };
+  return { reply: '小芒狗没看懂这个问题' };
 }
 
 // 渲染结果卡片
@@ -4521,7 +4521,7 @@ async function generateReview(year, month) {
     <div class="review-text-card">
       <div class="review-text-card-header">
         <img src="${IMG.book}" alt="">
-        <span class="header-text">小小塔想说</span>
+        <span class="header-text">小芒狗想说</span>
       </div>
       <div id="reviewLLMText" style="color: var(--ink-soft); font-size: 13px; text-align: center; padding: 10px 0;">
         正在和你的账本聊天...
@@ -4550,7 +4550,7 @@ ${year}年${month+1}月数据：
 ${stats.budget > 0 ? `- 每日预算 ¥${stats.budget}，超支 ${stats.budgetDays.over} 天，达标 ${stats.budgetDays.under + stats.budgetDays.exact} 天` : '- 没设预算'}
   `.trim();
 
-  const systemPrompt = `你是"小小塔"，一只可爱治愈的小狗财务管家。
+  const systemPrompt = `你是"小芒狗"，一只可爱治愈的小狗财务管家。
 以朋友聊天的口吻分析用户的月度账单，语气随意、口语化、温柔幽默，可以适度调侃但不刻薄。
 要求：
 - 4-5 段，每段 1-3 句
@@ -4561,7 +4561,7 @@ ${stats.budget > 0 ? `- 每日预算 ¥${stats.budget}，超支 ${stats.budgetDa
 - 不要用 markdown 格式
 - 不要使用列表符号或 emoji
 - 直接说话，不要"亲爱的"或"以下是分析"这种开场
-- 称呼用"你"，自称可以是"小小塔"或不自称
+- 称呼用"你"，自称可以是"小芒狗"或不自称
 段与段之间用一个空行隔开。`;
 
   try {
@@ -4587,7 +4587,7 @@ ${stats.budget > 0 ? `- 每日预算 ¥${stats.budget}，超支 ${stats.budgetDa
     haptic('success');
   } catch (err) {
     console.error(err);
-    document.getElementById('reviewLLMText').textContent = '小小塔刚才走神了，再点一次试试？';
+    document.getElementById('reviewLLMText').textContent = '小芒狗刚才走神了，再点一次试试？';
   }
 }
 
@@ -5062,9 +5062,9 @@ function renderYearlyPages(year, stats) {
       ${monthHtml}
 
       <div class="yearly-section">
-        <div class="yearly-section-label">小小塔想说</div>
+        <div class="yearly-section-label">小芒狗想说</div>
         <div id="yearlyCommentText" style="color: var(--ink-soft); font-size: 13px; text-align: center; padding: 10px 0;">
-          小小塔正在憋话...
+          小芒狗正在憋话...
         </div>
       </div>
     </div>
@@ -5089,7 +5089,7 @@ ${year}年全年账单：
 - 最败家月份：${stats.topMonth ? parseInt(stats.topMonth.month.slice(5)) + '月，¥' + formatMoney(stats.topMonth.amount) : '无'}
   `.trim();
 
-  const systemPrompt = `你是"小小塔"，给用户写一段年度总结评语。
+  const systemPrompt = `你是"小芒狗"，给用户写一段年度总结评语。
 要求：
 - 朋友聊天口吻，温柔、可爱、口语化、有点小幽默
 - 3-4 句话即可，不要太长
@@ -5117,7 +5117,7 @@ ${year}年全年账单：
     document.getElementById('yearlyCommentText').innerHTML =
       `<div style="text-align:left; line-height:1.8; color:var(--ink);">${escapeHtml(text)}</div>`;
   } catch (err) {
-    document.getElementById('yearlyCommentText').textContent = '小小塔刚才走神了，再试试';
+    document.getElementById('yearlyCommentText').textContent = '小芒狗刚才走神了，再试试';
   }
 }
 
