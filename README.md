@@ -8,7 +8,7 @@
 
 ## 功能
 
-- **语音 / 文字记账** — 自然语言输入，DeepSeek V4 Pro 解析为账单
+- **语音 / 文字记账** — 自然语言输入，AI 自动区分收支一键记账
 - **AI 对话查询** — 问「本月奶茶花了多少」，AI 直接回答
 - **日历视图** — 收支双色显示，点某天看当天明细，点分类看日期分布
 - **分析视图** — 收支总览 + 储蓄率、近 6 月趋势、分类环比、支付方式 & 信用待还
@@ -47,7 +47,7 @@ python -m http.server 8080
 | 层 | 技术 |
 |---|---|
 | 前端 | 单文件 HTML/CSS/JS，约 5200 行 |
-| AI | DeepSeek V4 Pro API |
+| AI | DeepSeek V4-Flash API |
 | 存储 | localStorage（本地）+ Supabase（云端） |
 | 认证 | Supabase Magic Link |
 | 部署 | GitHub Pages |
