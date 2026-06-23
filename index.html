@@ -1510,6 +1510,12 @@ html, body {
   font-family: var(--font-cute);
   margin-top: 2px;
 }
+.pr-type-badge {
+  display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 10px;
+  font-family: var(--font-cute); flex-shrink: 0; line-height: 1.4;
+}
+.income-badge { background: #e8f5e9; color: #2e7d32; }
+.expense-badge { background: #fce4ec; color: #c62828; }
 
 .parse-result-del {
   width: 26px; height: 26px; border-radius: 8px;
@@ -2874,11 +2880,11 @@ document.querySelectorAll('.type-toggle-item').forEach(it => {
     const btn = document.getElementById('parseBtn');
     if (t === 'income') {
       btn.classList.add('income-btn');
-      document.getElementById('parseBtnText').textContent = '记下这笔收入';
     } else {
       btn.classList.remove('income-btn');
-      document.getElementById('parseBtnText').textContent = '让小芒狗帮我整理';
     }
+    // 统一按钮文案，AI 会自动区分收支
+    document.getElementById('parseBtnText').textContent = '让小芒狗帮我整理';
     haptic('light');
   });
 });
@@ -3001,7 +3007,7 @@ function stopRecording() {
 }
 
 // ===== DeepSeek 调用（修复了日期解析）=====
-async function callDeepSeek(text, type) {
+async function callDeepSeek(text) {
   const apiKey = getApiKey();
   if (!apiKey) {
     showToast('请先在设置里填入 DeepSeek API Key');
@@ -3013,35 +3019,24 @@ async function callDeepSeek(text, type) {
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const dayBefore = new Date(Date.now() - 86400000*2).toISOString().slice(0, 10);
 
-  let systemPrompt;
-  if (type === 'income') {
-    systemPrompt = `你是记账助手。把用户说的话解析成 JSON 数组（收入账单）。
-每条包含：desc（简短描述，10字内）、category（分类）、amount（数字）、date（YYYY-MM-DD 格式）。
-分类只能从这些里选：${INC_CAT_LIST.join('、')}。
+  const systemPrompt = `你是记账助手。把用户说的话解析成 JSON 数组。
+每条包含：type（"income"或"expense"）、desc（简短描述，10字内）、category（分类）、amount（数字）、date（YYYY-MM-DD 格式）。
+支出分类只能从这些里选：${CAT_LIST.join('、')}。
+收入分类只能从这些里选：${INC_CAT_LIST.join('、')}。
 日期参考：今天=${today}，昨天=${yesterday}，前天=${dayBefore}，明天=${tomorrow}。
 如果用户没明确说时间，date 用 ${today}。
 只返回 JSON 数组，不要任何其他文字。
-示例输入："今天工资到账 8000，朋友还了我 500"
-示例输出：[{"desc":"工资","category":"工资","amount":8000,"date":"${today}"},{"desc":"朋友还钱","category":"其他收入","amount":500,"date":"${today}"}]`;
-  } else {
-    systemPrompt = `你是记账助手。把用户说的话解析成 JSON 数组（支出账单）。
-每条包含：desc（简短描述，10字内）、category（分类）、amount（数字）、date（YYYY-MM-DD 格式）。
-分类只能从这些里选：${CAT_LIST.join('、')}。
-日期参考：今天=${today}，昨天=${yesterday}，前天=${dayBefore}，明天=${tomorrow}。
-如果用户没明确说时间，date 用 ${today}。
-如果用户说"昨天"，date 用 ${yesterday}。
-如果用户说"前天"，date 用 ${dayBefore}。
-只返回 JSON 数组，不要任何其他文字。
-示例输入："昨天买水 6 块，今天吃饭 20"
-示例输出：[{"desc":"买水","category":"日用","amount":6,"date":"${yesterday}"},{"desc":"吃饭","category":"餐饮","amount":20,"date":"${today}"}]`;
-  }
+示例输入1："工资到账 8000，吃饭 50"
+示例输出1：[{"type":"income","desc":"工资","category":"工资","amount":8000,"date":"${today}"},{"type":"expense","desc":"吃饭","category":"餐饮","amount":50,"date":"${today}"}]
+示例输入2："昨天买水 6 块，今天朋友还我 500"
+示例输出2：[{"type":"expense","desc":"买水","category":"日用","amount":6,"date":"${yesterday}"},{"type":"income","desc":"朋友还钱","category":"其他收入","amount":500,"date":"${today}"}]`;
 
   try {
     const resp = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: text }
@@ -3078,27 +3073,27 @@ async function parseAndShow() {
   showLoading('小芒狗在思考...');
   haptic('light');
 
-  const result = await callDeepSeek(text, STATE.currentType);
+  const result = await callDeepSeek(text);
   hideLoading();
 
   if (!result || result.length === 0) { showToast('没识别到账单内容'); haptic('error'); return; }
 
   const today = new Date().toISOString().slice(0, 10);
-  const catList = STATE.currentType === 'income' ? INC_CAT_LIST : CAT_LIST;
-  const defaultCat = STATE.currentType === 'income' ? '其他收入' : '其他';
 
   STATE.parsedTemp = result.map(r => {
+    const isIncome = r.type === 'income';
+    const catList = isIncome ? INC_CAT_LIST : CAT_LIST;
+    const defaultCat = isIncome ? '其他收入' : '其他';
     let cat = r.category;
     if (!catList.includes(cat)) {
-      // 兜底：用本地分类猜
-      cat = STATE.currentType === 'expense' ? localGuessCategory(r.desc || '') : defaultCat;
+      cat = isIncome ? defaultCat : (localGuessCategory(r.desc || '') || defaultCat);
     }
     return {
       desc: r.desc || '其他',
       category: cat,
       amount: Number(r.amount) || 0,
       date: r.date && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : today,
-      type: STATE.currentType
+      type: isIncome ? 'income' : 'expense'
     };
   });
 
@@ -3108,20 +3103,25 @@ async function parseAndShow() {
 
 function renderParseResult() {
   const list = document.getElementById('parseResultList');
-  const catMap = STATE.currentType === 'income' ? INCOME_CATEGORIES : CATEGORIES;
-  const catList = STATE.currentType === 'income' ? INC_CAT_LIST : CAT_LIST;
 
   list.innerHTML = STATE.parsedTemp.map((item, idx) => {
+    const isIncome = item.type === 'income';
+    const catMap = isIncome ? INCOME_CATEGORIES : CATEGORIES;
+    const catList = isIncome ? INC_CAT_LIST : CAT_LIST;
     const cat = catMap[item.category] || catMap[catList[0]];
+    const typeBadge = isIncome ? '<span class="pr-type-badge income-badge">收入</span>' : '<span class="pr-type-badge expense-badge">支出</span>';
     return `
       <div class="parse-result-item">
         <div class="pr-cat-icon"><img src="${IMG[cat.img]}" alt=""></div>
         <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:4px;">
-          <input class="pr-desc" type="text" value="${escapeHtml(item.desc)}" oninput="STATE.parsedTemp[${idx}].desc=this.value">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input class="pr-desc" type="text" value="${escapeHtml(item.desc)}" oninput="STATE.parsedTemp[${idx}].desc=this.value">
+            ${typeBadge}
+          </div>
           <div class="pr-date">${formatDate(item.date)}</div>
         </div>
-        <select class="pr-cat" onchange="STATE.parsedTemp[${idx}].category=this.value; renderParseResult()">
-          ${catList.map(c => `<option value="${c}" ${c===item.category?'selected':''}>${c}</option>`).join('')}
+        <select class="pr-cat" onchange="STATE.parsedTemp[${idx}].category=this.value; STATE.parsedTemp[${idx}].type=this.selectedOptions[0].dataset.itype||STATE.parsedTemp[${idx}].type; renderParseResult()">
+          ${catList.map(c => `<option value="${c}" ${c===item.category?'selected':''} data-itype="${isIncome?'income':'expense'}">${c}</option>`).join('')}
         </select>
         <input class="pr-amt" type="number" step="0.01" value="${item.amount}" oninput="STATE.parsedTemp[${idx}].amount=Number(this.value)||0">
         <button class="parse-result-del" onclick="removeParseItem(${idx})">✕</button>
@@ -3129,9 +3129,11 @@ function renderParseResult() {
     `;
   }).join('');
 
-  const total = STATE.parsedTemp.reduce((s, x) => s + x.amount, 0);
-  const typeTxt = STATE.currentType === 'income' ? '收入' : '账单';
-  document.getElementById('parseModalTitle').textContent = `共 ${STATE.parsedTemp.length} 笔${typeTxt} · 合计 ¥${total.toFixed(2)}`;
+  const incTotal = STATE.parsedTemp.filter(x => x.type === 'income').reduce((s, x) => s + x.amount, 0);
+  const expTotal = STATE.parsedTemp.filter(x => x.type !== 'income').reduce((s, x) => s + x.amount, 0);
+  const incText = incTotal > 0 ? ` 收入 ¥${incTotal.toFixed(2)}` : '';
+  const expText = expTotal > 0 ? ` 支出 ¥${expTotal.toFixed(2)}` : '';
+  document.getElementById('parseModalTitle').textContent = `共 ${STATE.parsedTemp.length} 笔 ·${incText}${expText}`;
 }
 
 function removeParseItem(idx) {
@@ -3160,7 +3162,7 @@ function saveBills() {
       id: now + i, ts: now,
       date: item.date || today,
       desc: item.desc, category: item.category,
-      amount: item.amount, type: item.type || STATE.currentType,
+      amount: item.amount, type: item.type || 'expense',
       pay_method: 'wechat'
     });
   });
@@ -3179,7 +3181,7 @@ function saveBills() {
 
   // 如果今天已结束，但又加了今天的支出账，提醒
   const todayAdded = STATE.parsedTemp.some(x =>
-    (x.date || today) === today && (x.type || STATE.currentType) === 'expense'
+    (x.date || today) === today && (x.type || 'expense') === 'expense'
   );
   if (wasDayEnded && todayAdded) {
     setTimeout(() => {
@@ -4286,7 +4288,7 @@ async function parseChatIntent(question) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: question }
@@ -4569,7 +4571,7 @@ ${stats.budget > 0 ? `- 每日预算 ¥${stats.budget}，超支 ${stats.budgetDa
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userInfo }
@@ -5103,7 +5105,7 @@ ${year}年全年账单：
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
       body: JSON.stringify({
-        model: 'deepseek-v4-pro',
+        model: 'deepseek-v4-flash',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userInfo }
