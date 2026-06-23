@@ -366,30 +366,6 @@ html, body {
 }
 
 /* ========== 收入/支出切换 ========== */
-.type-toggle {
-  display: flex; gap: 4px; margin-bottom: 12px;
-  background: var(--bg-tint); padding: 4px; border-radius: 14px;
-}
-
-.type-toggle-item {
-  flex: 1; padding: 8px; text-align: center;
-  font-size: 13px; border-radius: 10px;
-  cursor: pointer; color: var(--ink-soft);
-  font-family: var(--font-cute);
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  transition: all 0.2s;
-}
-
-.type-toggle-item.active.expense {
-  background: var(--paper); color: var(--expense);
-  box-shadow: 0 2px 6px rgba(230, 101, 101, 0.12);
-}
-
-.type-toggle-item.active.income {
-  background: var(--paper); color: var(--income);
-  box-shadow: 0 2px 6px rgba(124, 184, 95, 0.15);
-}
-
 /* ========== 输入区 ========== */
 .input-section {
   background: var(--paper); border-radius: var(--r-l);
@@ -1923,16 +1899,6 @@ html, body {
           <span id="inputTitleText">跟小芒狗说说今天花了啥</span>
         </div>
 
-        <!-- 收入/支出切换 -->
-        <div class="type-toggle">
-          <div class="type-toggle-item expense active" data-type="expense">
-            <i class="ico-minus"></i>支出
-          </div>
-          <div class="type-toggle-item income" data-type="income">
-            <i class="ico-plus"></i>收入
-          </div>
-        </div>
-
         <div class="input-tabs">
           <div class="input-tab active" data-tab="voice">
             <img src="" id="tabVoiceImg" alt="">
@@ -2715,18 +2681,17 @@ setImg('reviewCardImg', 'mango');
 // ===== 时间问候 =====
 function getTimeOfDay() {
   const h = new Date().getHours();
-  if (h >= 6 && h < 10) return { period: 'morning', img: 'flower', greeting: '早上好呀', title: '今天有什么计划？' };
-  if (h >= 10 && h < 14) return { period: 'noon', img: 'sing', greeting: '中午啦', title: '中午吃了啥？' };
-  if (h >= 14 && h < 18) return { period: 'afternoon', img: 'bubbletea', greeting: '下午好', title: '下午花了啥？' };
-  if (h >= 18 && h < 22) return { period: 'evening', img: 'book', greeting: '晚上好', title: '今天还顺利吗？' };
-  return { period: 'night', img: 'sleep', greeting: '夜深啦', title: '睡前还有要记的吗？' };
+  if (h >= 6 && h < 10) return { period: 'morning', img: 'flower', greeting: '早上好呀', title: '早呀，今天开始记钱钱啦～' };
+  if (h >= 10 && h < 14) return { period: 'noon', img: 'sing', greeting: '中午啦', title: '中午吃了啥好的？记上记上～' };
+  if (h >= 14 && h < 18) return { period: 'afternoon', img: 'bubbletea', greeting: '下午好', title: '下午茶时间，钱钱还好吗～' };
+  if (h >= 18 && h < 22) return { period: 'evening', img: 'book', greeting: '晚上好', title: '今天钱钱进进出出，都记了吗？' };
+  return { period: 'night', img: 'sleep', greeting: '夜深啦', title: '睡前盘点一下钱钱故事～' };
 }
 
 // ===== 全局状态 =====
 const STATE = {
   bills: [],
   currentTab: 'voice',
-  currentType: 'expense',  // 收入/支出
   recognition: null,
   isRecording: false,
   parsedTemp: [],
@@ -2866,25 +2831,6 @@ document.querySelectorAll('.input-tab').forEach(tab => {
     document.getElementById('tab-voice').style.display = t === 'voice' ? 'flex' : 'none';
     document.getElementById('tab-text').style.display = t === 'text' ? 'block' : 'none';
     STATE.currentTab = t;
-    haptic('light');
-  });
-});
-
-document.querySelectorAll('.type-toggle-item').forEach(it => {
-  it.addEventListener('click', () => {
-    const t = it.dataset.type;
-    STATE.currentType = t;
-    document.querySelectorAll('.type-toggle-item').forEach(x => x.classList.remove('active'));
-    it.classList.add('active');
-    // 切换主按钮样式
-    const btn = document.getElementById('parseBtn');
-    if (t === 'income') {
-      btn.classList.add('income-btn');
-    } else {
-      btn.classList.remove('income-btn');
-    }
-    // 统一按钮文案，AI 会自动区分收支
-    document.getElementById('parseBtnText').textContent = '让小芒狗帮我整理';
     haptic('light');
   });
 });
